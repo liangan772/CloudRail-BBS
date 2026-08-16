@@ -1,57 +1,159 @@
-# CloudRail 论坛（工作区代号，可替换）
+# CloudRail 论坛
 
-一个中文社区论坛项目：**自研前端（HTML/JS + 现代框架）+ Discourse 后端**。
+前后端分离的中文社区论坛系统，一套 API 同时支撑 **Web / H5 / App / 小程序** 多端。内置签到、积分、等级、任务、成就、排行榜等活跃度机制，以及轮播图、话题广场、投票帖、举报、拉黑等国内主流论坛功能。
 
-- **前端**：Nuxt 3（Vue 3 + TypeScript + Vite），SSR 保证 SEO，技术栈完全自主可控
-- **后端**：Discourse（Ruby on Rails 8 / Ruby 3.4），承担数据存储、权限、审核、邮件、搜索、限流等全部业务能力
-- **对接方式**：Discourse REST API + MessageBus（实时消息）+ 同域反向代理（登录会话 / 上传 / WebSocket 走同一域名，避免跨域问题）
+## 功能特性
+
+### 内容与互动
+- 帖子：发帖（富文本 / Markdown）、编辑、软删除、多图上传、置顶 / 加精、**匿名发帖**
+- 评论：两级结构（评论 + 楼中楼）、点赞、收藏
+- 分类 / 标签 / **话题广场**（话题热度榜、关注话题）
+- **投票帖**（单选 / 多选、截止时间、一人一票）、**草稿箱**（自动保存）
+- **轮播图**运营位、**推荐流**、**公告中心**、浏览足迹、分享海报
+- 搜索：全文检索 + 热词
+
+### 用户与认证
+- 注册 / 登录（图形验证码、登录限流）、JWT 双 Token（Access + Refresh，轮换与重用检测）
+- 手机号验证码登录、第三方登录（微信 / QQ / GitHub）、扫码登录
+- 多端会话管理（设备列表、远程踢下线）、找回密码
+- **举报**（后台处理队列）、**拉黑 / 屏蔽**（双向不可见）
+
+### 活跃度体系
+- 每日签到（连续天数加成、签到日历）、积分账户（流水审计）
+- 等级 / 头衔、每日任务 / 新手任务、成就勋章
+- 排行榜（积分 / 签到 / 贡献）、邀请奖励、关注动态流
+
+### 通知与推送
+- 通知中心（回复 / 点赞 / 关注 / 公告 / 私信）、未读数
+- App 消息推送（APNs / FCM / 厂商通道）、短信服务
+
+### 管理后台
+- 运营看板、用户 / 内容管理、敏感词库、激励配置
+- 轮播图管理、举报处理、话题运营
+
+## 技术栈
+
+| 端 | 技术 |
+| --- | --- |
+| 前端 | Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus |
+| 后端 | Python 3.11+ / FastAPI + SQLAlchemy 2.0（异步）+ Alembic + Celery |
+| 数据库 | PostgreSQL 16 |
+| 缓存 / 队列 | Redis 7 |
+| 部署 | Docker Compose + Nginx |
+
+## 目录结构
 
 ```
-用户浏览器
-   │
-   ▼
-nginx (forum.example.com:443)
-   ├── / 及前端路由        → Nuxt SSR 应用（自研前端）
-   ├── /session /message-bus /uploads /user-api-key /raw 及 *.json API
-   │                        → Discourse（官方 Docker，内网端口）
-   └── /admin 等系统路径    → 仅内网/管理员白名单
+├── docs/            # 开发文档（架构、数据库、API、缓存、部署等完整设计）
+├── frontend/        # 前端（Vue 3 + Vite）
+├── backend/         # 后端（FastAPI + Celery）
+└── deploy/          # 部署（docker-compose、nginx、Dockerfile）
 ```
 
-> Discourse 只作为后端服务，不对外提供其自带的 Ember 页面（管理员后台除外，见 `docs/02`）。
-> 参考源码位于 `D:\discourse`（只读参考；插件开发阶段再按 `docs/06` 准备可写副本）。
+## 快速开始
 
-## 文档索引
+> 前置要求：Python 3.11+、Node.js 18+、Docker（可选，用于启动数据库与 Redis）
 
-| 文档 | 内容 |
-|------|------|
-| [docs/01-项目概述与技术选型.md](docs/01-项目概述与技术选型.md) | 产品定位、功能范围、技术选型与取舍、风险 |
-| [docs/02-系统架构与后端接入.md](docs/02-系统架构与后端接入.md) | 部署形态、认证/CSRF、API 端点清单、实时消息、上传、错误与限流、后端扩展 |
-| [docs/03-前端工程规范.md](docs/03-前端工程规范.md) | 前端技术栈、目录结构、API 客户端、状态管理、组件与代码规范、性能 |
-| [docs/04-数据模型与功能规划.md](docs/04-数据模型与功能规划.md) | 功能清单、Discourse 数据模型映射、站点设置、权限、内容治理、插件路线 |
-| [docs/05-中文支持与本地化.md](docs/05-中文支持与本地化.md) | 中文 locale、中文用户名/搜索、前端 i18n、SEO、内容规范 |
-| [docs/06-开发环境搭建.md](docs/06-开发环境搭建.md) | Discourse 与前端环境、联调代理、种子数据、常用命令、排障 |
-| [docs/07-测试与质量保障.md](docs/07-测试与质量保障.md) | 测试分层、工具、CI 门禁、质量红线 |
-| [docs/08-部署运维与安全.md](docs/08-部署运维与安全.md) | 生产拓扑、Docker 部署、备份升级、监控、安全清单、大陆合规（备案） |
-| [docs/09-开发工作流程.md](docs/09-开发工作流程.md) | 分支模型、任务流转、PR/评审、发布流程、里程碑计划 |
-
-## 快速开始（详见 docs/06）
+### 1. 启动依赖（PostgreSQL + Redis）
 
 ```bash
-# 1. 启动 Discourse（官方 Docker，约 10 分钟）
-# 2. 启动前端
-cd web && pnpm install && pnpm dev
-# 3. 打开 http://localhost:5173，登录后即可发帖
+docker compose -f deploy/docker-compose.yml up -d postgres redis
 ```
 
-## 仓库规划（建议）
+不使用 Docker 时，请自行安装 PostgreSQL 16 与 Redis 7，并修改 `backend/.env` 中的连接串。
 
-```
-E:\CloudRail\
-├── README.md
-├── docs/                    # 开发文档（本套文档）
-├── web/                     # 自研前端（Nuxt 3）
-├── discourse/               # （后续）Discourse 源码副本，仅插件开发时使用
-└── deploy/                  # nginx 配置、部署脚本、监控配置
+### 2. 后端
+
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate；macOS/Linux: source .venv/bin/activate
+./.venv/Scripts/activate
+
+pip install -e ".[dev]"
+# 国内网络可加镜像参数：-i https://mirrors.aliyun.com/pypi/simple/
+
+cp .env.example .env        # 按需修改数据库/Redis/密钥配置
+alembic upgrade head        # 应用数据库迁移
+uvicorn app.main:app --reload --port 8000
 ```
 
-当前 `docs/` 已就绪；`web/`、`deploy/` 待里程碑 M0 创建（见 docs/09）。
+- API 文档（Swagger UI）：<http://localhost:8000/docs>
+- 健康检查：<http://localhost:8000/health>
+
+### 3. 前端
+
+```bash
+cd frontend
+npm install
+npm run dev     # http://localhost:5173（/api 自动代理到 8000）
+```
+
+### 4. Celery（异步任务，可选启动）
+
+```bash
+cd backend
+celery -A app.tasks.celery_app:celery_app worker --loglevel=info   # 任务 Worker
+celery -A app.tasks.celery_app:celery_app beat --loglevel=info     # 定时任务
+```
+
+## 测试
+
+```bash
+# 后端
+cd backend
+pytest
+
+# 前端（类型检查 + 构建）
+cd frontend
+npm run build
+```
+
+## 部署
+
+```bash
+# 一键启动全部服务（PostgreSQL + Redis + 后端 + Worker + Beat + Nginx/前端）
+cd deploy
+cp .env.example .env        # 修改密码与密钥
+docker compose up -d --build
+```
+
+- 前端：<http://localhost>
+- 后端 API：<http://localhost/api/>
+
+生产环境部署要点（详见开发文档第 10 章）：HTTPS 证书、`SECRET_KEY` 替换为随机 64 字节、数据库主从、监控告警。
+
+## 配置说明
+
+后端环境变量（`backend/.env`，完整清单见开发文档 10.3 节）：
+
+| 变量 | 说明 |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL 连接串（异步驱动） |
+| `REDIS_URL` | Redis 连接串 |
+| `SECRET_KEY` | JWT 签名密钥（生产必须更换） |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | Token 有效期 |
+| `CORS_ORIGINS` | 允许的前端来源（逗号分隔） |
+| `SMS_*` / `PUSH_*` / `OAUTH_*` | 短信 / 推送 / 第三方登录凭证（可选） |
+
+## 文档
+
+- [开发文档](docs/开发文档.md)：总体架构、功能需求、数据库设计（ER 图 + 表结构）、API 接口清单、缓存与队列设计、核心实现要点、部署方案、里程碑计划
+- API 调试：后端启动后访问 <http://localhost:8000/docs>
+
+## 开发路线
+
+| 阶段 | 内容 |
+| --- | --- |
+| M1 | 项目搭建（脚手架、CI、数据库迁移基线） |
+| M2 | 用户体系与认证（JWT、短信、第三方登录、多设备） |
+| M3 | 内容与互动（帖子、评论、投票、草稿、匿名、足迹） |
+| M4–M5 | 检索缓存、通知推送 |
+| M6–M7 | 管理后台、活跃度体系 |
+| M8–M10 | APP 端支撑（底部导航、扫码登录）、安全加固、上线打磨 |
+
+完整里程碑见开发文档第 12 章（合计约 16 周，2 人并行）。
+
+---
+
+*项目骨架阶段：后端 API 模块与前端页面已就绪（占位实现），业务逻辑按开发文档逐模块开发中。*
