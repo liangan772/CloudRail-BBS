@@ -1,6 +1,7 @@
 name: Docker
 
-# 构建并发布合并镜像（Nginx 前端 + FastAPI 后端）到 GHCR：ghcr.io/<owner>/<repo>
+# 唯一的镜像工作流：构建并发布合并镜像（Nginx 前端 + FastAPI 后端）到 GHCR：
+# ghcr.io/<owner>/<repo>；PR 时仅构建验证不推送；同时执行依赖安全扫描。
 
 on:
   schedule:
@@ -16,6 +17,7 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  # ---------- 构建 + 发布 Docker 镜像 ----------
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -67,3 +69,26 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }}
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
+  # ---------- 依赖安全扫描（信息性：发现高危漏洞时输出告警，不阻断） ----------
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm audit (frontend)
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund --omit=dev || true
+          npm audit --omit=dev --audit-level=high || echo "::warning::npm audit 发现高危漏洞，请检查 frontend/package.json"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: pip-audit (backend)
+        run: |
+          pip install pip-audit
+          pip-audit -r <(sed -n '/\[project\]/,/^\[/p' backend/pyproject.toml | grep -E '^    "' | tr -d ' ",') || echo "::warning::pip-audit 发现漏洞，请检查 backend/pyproject.toml"
