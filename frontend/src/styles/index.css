@@ -1,15 +1,85 @@
-/* 全局样式：设计变量、响应式断点、移动端安全区（文档 4.12 适配规范） */
+/* ============================================================
+   CloudRail 论坛 · 全局设计体系
+   设计令牌：色板 / 字号 / 间距 / 圆角 / 阴影 / Element Plus 主题覆盖
+   ============================================================ */
 
 :root {
+  /* ---- 品牌色 ---- */
   --color-primary: #2f6bff;
-  --color-bg: #f5f6f8;
-  --color-card: #ffffff;
-  --color-text: #1f2329;
-  --color-text-secondary: #646a73;
+  --color-primary-hover: #4a7dff;
+  --color-primary-active: #2656cc;
+  --color-primary-light: #eaf0ff;
+  --color-primary-soft: #f4f8ff;
+
+  /* ---- 语义色 ---- */
+  --color-success: #00b42a;
+  --color-warning: #ff7d00;
+  --color-danger: #f53f3f;
+  --color-info: #86909c;
+
+  /* ---- 中性色阶 ---- */
+  --color-bg: #f2f3f5; /* 页面背景 */
+  --color-card: #ffffff; /* 卡片背景 */
+  --color-border: #e5e6eb; /* 常规边框 */
+  --color-border-light: #f0f1f3; /* 细分隔线 */
+
+  /* ---- 文本色阶 ---- */
+  --color-text: #1f2329; /* 主文本 */
+  --color-text-2: #4e5969; /* 次级文本 */
+  --color-text-3: #86909c; /* 弱化文本/占位 */
+  --color-text-inverse: #ffffff;
+
+  /* ---- 字号刻度 ---- */
+  --font-size-xs: 12px;
+  --font-size-sm: 13px;
+  --font-size-base: 14px;
+  --font-size-md: 15px;
+  --font-size-lg: 16px;
+  --font-size-xl: 18px;
+  --font-size-2xl: 20px;
+  --font-size-3xl: 24px;
+
+  /* ---- 间距刻度（4px 基准） ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- 圆角 ---- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* ---- 阴影 ---- */
+  --shadow-sm: 0 1px 2px rgb(31 35 41 / 4%);
+  --shadow-md: 0 2px 8px rgb(31 35 41 / 6%);
+  --shadow-lg: 0 8px 24px rgb(31 35 41 / 10%);
+
+  /* ---- 布局 ---- */
+  --header-height: 56px;
+  --container-width: 1200px;
+  --sidebar-width: 300px;
   --tabbar-height: 50px;
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* ---- Element Plus 主题对齐品牌色 ---- */
+  --el-color-primary: #2f6bff;
+  --el-color-primary-light-3: #5b87ff;
+  --el-color-primary-light-5: #85a5ff;
+  --el-color-primary-light-7: #b0c4ff;
+  --el-color-primary-light-8: #c5d4ff;
+  --el-color-primary-light-9: #eaf0ff;
+  --el-color-primary-dark-2: #2656cc;
+  --el-border-radius-base: 6px;
+  --el-font-size-base: 14px;
 }
 
+/* ---- 基础重置 ---- */
 * {
   box-sizing: border-box;
 }
@@ -25,26 +95,129 @@ body,
 body {
   font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', sans-serif;
+    'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: var(--color-primary);
   text-decoration: none;
+  transition: color 0.15s ease;
 }
 
-/* 页面容器：内容区为移动端 TabBar 预留底部空间 */
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+img {
+  max-width: 100%;
+}
+
+/* ---- 通用页面容器 ---- */
 .page {
-  max-width: 960px;
+  max-width: var(--container-width);
   margin: 0 auto;
-  padding: 16px;
+  padding: var(--space-4);
 }
 
+/* 页面标题（占位页统一头部） */
+.page-header {
+  margin-bottom: var(--space-4);
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.page-header .page-header-desc {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-3);
+}
+
+/* ---- 通用卡片 ---- */
+.card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-pad {
+  padding: var(--space-4);
+}
+
+/* ---- 通用徽标 ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge-pinned {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.badge-essence {
+  background: var(--color-warning);
+  color: #fff;
+}
+
+.badge-anonymous {
+  background: var(--color-bg);
+  color: var(--color-text-2);
+}
+
+/* ---- 通用空状态 ---- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-4);
+  color: var(--color-text-3);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.empty-state .empty-icon {
+  font-size: 40px;
+  margin-bottom: var(--space-3);
+  color: var(--color-border);
+}
+
+/* ---- 数字等宽对齐 ---- */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 移动端：内容区为 TabBar 预留底部空间 ---- */
 @media (max-width: 767px) {
   .page {
-    padding-bottom: calc(var(--tabbar-height) + var(--safe-area-bottom) + 16px);
+    padding-bottom: calc(var(--tabbar-height) + var(--safe-area-bottom) + var(--space-4));
+  }
+}
+
+/* ---- 减少动效偏好 ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

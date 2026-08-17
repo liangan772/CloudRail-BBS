@@ -1,41 +1,43 @@
 # CloudRail 论坛
 
-前后端分离的中文社区论坛系统，一套 API 同时支撑 **Web / H5 / App / 小程序** 多端。内置签到、积分、等级、任务、成就、排行榜等活跃度机制，以及轮播图、话题广场、投票帖、举报、拉黑、**AI 自动审核**等主流论坛功能。
+> **版本：v0.1.0** ｜ 核心业务闭环（注册登录 → 发帖评论 → 管理后台）已实现可运行
+
+前后端分离的中文社区论坛系统，一套 API 同时支撑 **Web / H5 / App / 小程序** 多端。核心业务闭环（注册登录 → 发帖评论 → 管理后台）已可运行，并规划了签到、积分、投票、话题广场、AI 自动审核等主流论坛能力。
 
 ## 功能特性
 
+> ✅ 已实现可用 ｜ 🚧 规划中（见开发文档）
+
 ### 内容与互动
-- 帖子：发帖（富文本 / Markdown）、编辑、软删除、多图上传、置顶 / 加精、**匿名发帖**
-- 评论：两级结构（评论 + 楼中楼）、点赞、收藏
-- 分类 / 标签 / **话题广场**（话题热度榜、关注话题）
-- **投票帖**（单选 / 多选、截止时间、一人一票）、**草稿箱**（自动保存）
-- **轮播图**运营位、**推荐流**、**公告中心**、浏览足迹、分享海报
-- 搜索：全文检索 + 热词
+| 状态 | 功能 |
+| --- | --- |
+| ✅ | 发帖（分类、**匿名发帖**、标题/正文校验）、帖子列表（最新/热门/精华、游标分页）、详情（浏览计数） |
+| ✅ | 评论列表 / 发表评论（需登录 + 验证码） |
+| ✅ | 帖子卡片封面图展示（受后台「帖子图片展示」开关控制） |
+| 🚧 | 富文本/Markdown 编辑器、编辑/软删除、多图上传、置顶/加精、点赞/收藏、投票帖、草稿箱 |
+| 🚧 | 分类标签、话题广场、轮播图、推荐流、公告中心、浏览足迹、全文搜索、分享海报 |
 
 ### 用户与认证
-- 注册 / 登录（图形验证码、登录限流）、JWT 双 Token（Access + Refresh，轮换与重用检测）
-- 手机号验证码登录、第三方登录（微信 / QQ / GitHub）、扫码登录
-- 多端会话管理（设备列表、远程踢下线）、找回密码
-- **举报**（后台处理队列）、**拉黑 / 屏蔽**（双向不可见）
+| 状态 | 功能 |
+| --- | --- |
+| ✅ | 注册 / 登录（**图形验证码**必填校验，首用户自动成为管理员）、JWT 双 Token、注册即登录 |
+| ✅ | 管理后台 / 发帖**强制登录**（未登录自动跳转登录页并回跳） |
+| ✅ | 登录/注册失败自动刷新验证码 |
+| 🚧 | 手机号验证码登录、第三方登录（微信/QQ/GitHub）、扫码登录、多端会话管理、找回密码、举报、拉黑 |
 
 ### AI 自动审核（v1.3）
-- LLM 内容安全审核（OpenAI 兼容协议：DeepSeek / 通义千问 / 智谱，可切换供应商）
-- 审核结论：`pass` 通过 / `review` 转人工 / `reject` 拦截，附违规分与命中类别
-- 两种模式：`sync` 先审后发 / `async` 先发后审（违规自动下架）；异常熔断降级，不阻塞发帖
-- 每次审核写入 `audit_records` 表，管理后台可查询复核
+- ✅ `POST /api/v1/audit/text` 同步审核接口（OpenAI 兼容协议：DeepSeek / 通义 / 智谱）
+- ✅ 审核结论 pass / review / reject + 违规分 + 命中类别；`audit_records` 表落库
+- 🚧 发帖/评论发布链路自动接入（sync 先审后发 / async 先发后审）
 
-### 活跃度体系
-- 每日签到（连续天数加成、签到日历）、积分账户（流水审计）
-- 等级 / 头衔、每日任务 / 新手任务、成就勋章
-- 排行榜（积分 / 签到 / 贡献）、邀请奖励、关注动态流
+### 管理后台（/admin，需登录 + 管理员角色）
+- ✅ 仪表盘（统计卡片 + 图表占位）、站点配置（帖子图片开关、站点名称，**真实读写** `site_configs` 表）
+- ✅ 侧边菜单 9 项（用户/内容/举报/轮播图/话题/AI 审核/敏感词，占位待开发）
+- 🚧 用户管理、内容审核、举报处理、轮播图管理、敏感词库、运营看板图表
 
-### 通知与推送
-- 通知中心（回复 / 点赞 / 关注 / 公告 / 私信）、未读数
-- App 消息推送（APNs / FCM / 厂商通道）、短信服务
-
-### 管理后台
-- 运营看板、用户 / 内容管理、敏感词库、激励配置
-- 轮播图管理、举报处理、话题运营、AI 审核记录
+### 规划中（活跃度 / 通知推送）
+- 🚧 签到、积分、等级、任务、成就、排行榜、邀请、关注动态流
+- 🚧 通知中心、App 推送（APNs/FCM/厂商通道）、短信服务
 
 ## 技术栈
 
@@ -43,35 +45,29 @@
 | --- | --- |
 | 前端 | Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus |
 | 后端 | Python 3.11+ / FastAPI + SQLAlchemy 2.0（异步）+ Alembic + Celery |
-| 数据库 | PostgreSQL 16 |
+| 数据库 | PostgreSQL 16（生产）；**SQLite 开发降级**（零依赖开箱即用） |
 | 缓存 / 队列 | Redis 7 |
 | AI 审核 | OpenAI 兼容协议（DeepSeek / 通义千问 / 智谱） |
-| 部署 | Docker Compose + Nginx |
+| 部署 | 单镜像 Docker（Nginx 前端 + FastAPI 后端）+ Docker Compose |
 
 ## 目录结构
 
 ```
 ├── docs/            # 开发文档（架构、数据库、API、缓存、部署等完整设计）
-├── frontend/        # 前端（Vue 3 + Vite）
-├── backend/         # 后端（FastAPI + Celery）
+├── frontend/        # 前端（Vue 3 + Vite；含 nginx.conf 与本地示例图 public/images）
+├── backend/         # 后端（FastAPI + Celery；含 run.sh / run.ps1 启动脚本）
 ├── deploy/          # 部署（docker-compose.yml、nginx 配置、entrypoint）
+├── scripts/         # 辅助脚本（check.sh 检查、e2e_check.py 端到端联调）
 ├── Dockerfile       # 合并镜像（Nginx 前端 + FastAPI 后端，单镜像）
-└── .dockerignore
+├── .dockerignore
+└── .github/workflows/  # CI：镜像构建检查 + GHCR 发布
 ```
 
 ## 快速开始
 
-> 前置要求：Python 3.11+、Node.js 18+、Docker（可选，用于启动数据库与 Redis / 一键部署）
+> 前置要求：Python 3.11+、Node.js 18+。数据库 **默认使用 SQLite**（`backend/forum.db`），无需安装 PostgreSQL；换用 PostgreSQL 只需改 `backend/.env` 的 `DATABASE_URL`。
 
-### 1. 启动依赖（PostgreSQL + Redis）
-
-```bash
-docker compose -f deploy/docker-compose.yml up -d postgres redis
-```
-
-不使用 Docker 时，请自行安装 PostgreSQL 16 与 Redis 7，并修改 `backend/.env` 中的连接串。
-
-### 2. 后端
+### 1. 后端
 
 ```bash
 cd backend
@@ -82,24 +78,15 @@ python -m venv .venv
 pip install -e ".[dev]"
 # 国内网络建议加镜像：-i https://mirrors.aliyun.com/pypi/simple/
 
-cp .env.example .env        # 按需修改数据库/Redis/密钥/AI 审核配置
-alembic upgrade head        # 应用数据库迁移
-
-# 启动后端（推荐使用脚本，自动加载 .env 中的 Uvicorn 配置）
-./run.sh                    # Git Bash / Linux / macOS；Windows PowerShell 用 .\run.ps1
-
-# 或直接显式指定参数（不依赖 .env）
-uvicorn app.main:app --reload --port 8000
+cp .env.example .env        # 按需修改密钥/数据库等配置
+./run.sh                    # 一键启动（自动加载 .env 的 Uvicorn 配置）；PowerShell 用 .\run.ps1
 ```
-
-> 说明：`backend/.env` 中的 `UVICORN_HOST` / `UVICORN_PORT` / `UVICORN_RELOAD` 等配置
-> 由 `run.sh` / `run.ps1` 加载到进程环境后生效（uvicorn 的 `--env-file` 无法配置其自身参数，
-> 仅能为应用注入环境变量）。
 
 - API 文档（Swagger UI）：<http://localhost:8000/docs>
 - 健康检查：<http://localhost:8000/health>
+- 首次启动自动建表 + 写入默认分类（技术交流/生活闲聊/站务公告）
 
-### 3. 前端
+### 2. 前端
 
 ```bash
 cd frontend
@@ -107,47 +94,103 @@ npm install
 npm run dev     # http://localhost:5173（/api 自动代理到 8000）
 ```
 
-### 4. Celery（异步任务，可选启动）
+### 3. 体验完整流程
+
+1. 打开 <http://localhost:5173/register> **注册**（首个用户自动成为管理员）
+2. 首页 <http://localhost:5173/home> 查看帖子列表（真实数据）
+3. 顶部「发帖」→ 选分类 + 填标题/正文 + 验证码 → 发布
+4. 帖子详情页发表评论（需登录 + 验证码）
+5. 右上角用户名 →「管理后台」→ 站点配置：关闭「帖子图片展示」开关 → 首页封面图立即隐藏
+
+### 4. Celery（异步任务，可选）
 
 ```bash
 cd backend
-celery -A app.tasks.celery_app:celery_app worker --loglevel=info   # 任务 Worker（含 AI 审核等）
+celery -A app.tasks.celery_app:celery_app worker --loglevel=info   # Worker（含 AI 审核等）
 celery -A app.tasks.celery_app:celery_app beat --loglevel=info     # 定时任务
 ```
 
 ## 测试
 
 ```bash
-# 后端（需先激活 backend/.venv）
-cd backend
-pytest
+# 后端单元测试（pytest，使用独立测试库）
+cd backend && pytest
 
-# 前端（类型检查 + 构建）
-cd frontend
-npm run build
+# 端到端联调（验证码 → 注册(管理员) → 登录 → 发帖 → 评论 → 后台配置 → 权限）
+cd backend && python ../scripts/e2e_check.py
+
+# 前端类型检查 + 构建
+cd frontend && npm run build
 ```
 
-## 部署
+## 部署教程
+
+### 0. 环境要求
+
+- Docker 20.10+（含 `docker compose` 插件）
+- 服务器开放 80 端口（本地演示可省略）
+- 建议 2 核 2G 以上（前端构建 + 后端 + 数据库）
+
+### 1. 准备部署配置
+
+```bash
+cd deploy
+cp .env.example .env
+# 修改 deploy/.env：
+#   PG_PASSWORD=强密码                # PostgreSQL 密码
+#   SECRET_KEY=<随机 64 字节>          # JWT 签名密钥（python -c "import secrets;print(secrets.token_urlsafe(48))"）
+#   CORS_ORIGINS=http://your-domain   # 允许的前端来源
+```
+
+### 2. 构建并启动全部服务
 
 ```bash
 # 方式一：从项目根目录
-docker compose -f deploy/docker-compose.yml up -d --build
-
-# 方式二：进入 deploy 目录
+cd .. && docker compose -f deploy/docker-compose.yml up -d --build
+# 方式二：已在 deploy 目录
 cd deploy && docker compose up -d --build
 ```
 
-两种方式均会启动：PostgreSQL + Redis + 合并镜像（Nginx 前端 + 后端 API）+ Worker + Beat。
+启动 6 个服务：PostgreSQL、Redis、后端（合并镜像：Nginx 前端 + FastAPI）、Celery Worker、Celery Beat。
+首次构建约 5–10 分钟（前端 npm 安装 + 后端 pip 安装）。
 
-- 前端：<http://localhost>（合并镜像内 Nginx 托管）
-- 后端 API：<http://localhost/api/>（Nginx 反代到容器内 FastAPI）
+### 3. 验证部署
 
-> 镜像策略：前后端打包为**单一镜像**（根目录 `Dockerfile`，多阶段构建：前端构建 → Python + Nginx 运行层）。
-> 手动构建：`docker build -t forum:latest .`；worker / beat 复用同一镜像，仅覆盖启动命令。
+```bash
+docker compose -f deploy/docker-compose.yml ps          # 全部 running 即正常
+curl http://localhost/api/v1/site-config                # 返回站点配置 JSON
+curl http://localhost/api/v1/posts                      # 帖子列表（初始为空）
+```
 
-> 首次部署请先 `cp deploy/.env.example deploy/.env` 并修改密码与密钥。
+浏览器访问 <http://localhost>：
 
-生产环境部署要点（详见开发文档第 10 章）：HTTPS 证书、`SECRET_KEY` 替换为随机 64 字节、数据库主从、监控告警。
+1. 打开 **注册** 页创建账号（**首个注册用户自动成为管理员**）
+2. 首页发帖 → 详情评论 → 右上角用户名进入**管理后台** → 站点配置
+
+### 4. 初始化与日常运维
+
+| 操作 | 命令 |
+| --- | --- |
+| 查看状态 | `docker compose -f deploy/docker-compose.yml ps` |
+| 后端日志 | `docker compose -f deploy/docker-compose.yml logs -f backend` |
+| Worker 日志 | `docker compose -f deploy/docker-compose.yml logs -f worker` |
+| 更新部署 | `docker compose -f deploy/docker-compose.yml up -d --build`（重新构建镜像） |
+| 仅重启 | `docker compose -f deploy/docker-compose.yml restart backend` |
+| 停止服务 | `docker compose -f deploy/docker-compose.yml down` |
+| 停止并清数据 | `docker compose -f deploy/docker-compose.yml down -v`（**删除数据库卷，慎用**） |
+
+> 首次启动说明：后端容器启动时自动建表并写入默认分类（技术交流 / 生活闲聊 / 站务公告）；
+> 数据库持久化于 Docker 卷 `pgdata`，升级/重建容器不会丢失数据。
+
+### 5. 生产环境加固（详见开发文档第 10 章）
+
+- **HTTPS**：绑定域名，配置 Nginx TLS（443 端口）+ 证书（Let's Encrypt / 云厂商）
+- **密钥**：`SECRET_KEY` 必须替换为随机值；`PG_PASSWORD` 使用强密码
+- **数据安全**：PostgreSQL 定时备份（`pg_dump`），可选主从复制
+- **持久化**：上传目录挂载卷（`/data/uploads`），避免容器重建丢图
+- **监控**：Prometheus + Grafana（QPS / 延迟 / Redis 命中率 / 队列深度）
+
+---
 
 ## 配置说明
 
@@ -155,35 +198,35 @@ cd deploy && docker compose up -d --build
 
 | 变量 | 说明 |
 | --- | --- |
-| `DATABASE_URL` / `REDIS_URL` | PostgreSQL / Redis 连接串 |
+| `DATABASE_URL` | 数据库连接串：开发 `sqlite+aiosqlite:///./forum.db`；生产 `postgresql+asyncpg://...` |
+| `REDIS_URL` | Redis 连接串（缓存 / Celery Broker） |
 | `SECRET_KEY` | JWT 签名密钥（生产必须更换） |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | Token 有效期 |
 | `CORS_ORIGINS` | 允许的前端来源（逗号分隔） |
-| `SMS_*` / `PUSH_*` / `OAUTH_*` | 短信 / 推送 / 第三方登录凭证（可选） |
-| `AI_ENABLED` | 是否启用 AI 审核（`true` / `false`） |
-| `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | LLM 供应商接入（OpenAI 兼容协议） |
+| `SMS_*` / `PUSH_*` / `OAUTH_*` | 短信 / 推送 / 第三方登录凭证（可选，规划中功能） |
+| `AI_ENABLED` / `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | AI 审核开关与 LLM 供应商（OpenAI 兼容协议） |
 | `AI_AUDIT_MODE` | 审核模式：`sync` 先审后发 / `async` 先发后审 / `off` 关闭 |
-| `AI_AUDIT_THRESHOLD` | 违规分阈值（默认 `0.6`，预留） |
 | `UVICORN_HOST` / `UVICORN_PORT` / `UVICORN_RELOAD` / `UVICORN_WORKERS` | Uvicorn 运行配置（由 `run.sh` / `run.ps1` 加载生效） |
 
 ## 文档
 
 - [开发文档](docs/开发文档.md)（v1.3）：总体架构、功能需求、数据库设计（ER 图 + 表结构）、API 接口清单、缓存与队列设计、核心实现要点、部署方案、里程碑计划
-- API 调试：后端启动后访问 <http://localhost:8000/docs>
+- API 调试：后端启动后访问 <http://localhost:8000/docs>（自动生成 Swagger UI）
 
 ## 开发路线
 
-| 阶段 | 内容 |
-| --- | --- |
-| M1 | 项目搭建（脚手架、CI、数据库迁移基线） |
-| M2 | 用户体系与认证（JWT、短信、第三方登录、多设备） |
-| M3 | 内容与互动（帖子、评论、投票、草稿、匿名、足迹、AI 审核接入） |
-| M4–M5 | 检索缓存、通知推送 |
-| M6–M7 | 管理后台（含 AI 审核记录）、活跃度体系 |
-| M8–M10 | APP 端支撑（底部导航、扫码登录）、安全加固、上线打磨 |
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| M1 | 项目搭建（脚手架、CI、Docker 单镜像、数据库迁移基线） | ✅ |
+| M2 | 用户体系（注册/登录/验证码/JWT/首用户管理员/强制登录） | ✅ |
+| M3 | 内容与互动（帖子/评论/分类/匿名/详情，验证码保护） | ✅ |
+| M6 | 管理后台（仪表盘/站点配置/角色权限） | 🚧 进行中 |
+| M3+ | 点赞收藏、投票、草稿、搜索、富文本编辑器 | 🚧 规划中 |
+| M4–M5 | 检索缓存、通知推送 | 🚧 规划中 |
+| M7–M10 | 活跃度体系、APP 端（底部导航）、安全加固、上线 | 🚧 规划中 |
 
-完整里程碑见开发文档第 12 章（合计约 16 周，2 人并行）。
+完整里程碑见开发文档第 12 章。
 
 ---
 
-*当前状态：项目骨架 + AI 自动审核 API 已实现可用；其余业务模块（认证、帖子、评论等）为占位实现，按开发文档逐模块开发中。*
+*当前状态：核心业务闭环（认证 / 内容 / 评论 / 后台配置）已实现并验证；其余功能按开发文档逐模块推进。*

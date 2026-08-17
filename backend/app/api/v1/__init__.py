@@ -26,6 +26,7 @@ from app.api.v1 import (
     polls,
     posts,
     reports,
+    site,
     tags,
     topics,
     users,
@@ -51,6 +52,7 @@ api_router.include_router(polls.router)
 api_router.include_router(history.router)
 api_router.include_router(announcements.router)
 api_router.include_router(audit.router)
+api_router.include_router(site.router)
 api_router.include_router(gamification.router)
 api_router.include_router(app_module.router)
 api_router.include_router(admin.router)

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">
+  <rect width="480" height="320" fill="#2f6bff"/>
+  <circle cx="120" cy="70" r="80" fill="#4a7dff" opacity="0.4"/>
+  <path d="M360 320 L420 240 L440 320 Z" fill="#ffffff" opacity="0.1"/>
+  <text x="40" y="150" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="30" font-weight="600" fill="#ffffff">社区活动</text>
+  <text x="40" y="184" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#c5d4ff">示例封面图 · 生活闲聊</text>
+</svg>

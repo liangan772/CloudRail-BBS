@@ -25,7 +25,7 @@ const router = createRouter({
       path: '/post/create',
       name: 'post-create',
       component: () => import('@/views/post/PostCreateView.vue'),
-      meta: { title: '发帖' },
+      meta: { title: '发帖', requiresAuth: true },
     },
     {
       path: '/post/:id',
@@ -58,10 +58,22 @@ const router = createRouter({
       meta: { title: '公告' },
     },
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/auth/LoginView.vue'),
+      meta: { title: '登录' },
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/auth/RegisterView.vue'),
+      meta: { title: '注册' },
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: () => import('@/views/admin/AdminDashboardView.vue'),
-      meta: { title: '管理后台', requiresRole: 2 },
+      meta: { title: '管理后台', requiresAuth: true, requiresRole: 2 },
     },
     {
       path: '/:pathMatch(.*)*',
@@ -72,12 +84,15 @@ const router = createRouter({
   ],
 })
 
-// 路由守卫：登录态与角色校验（TODO：接入 stores/user 后完善）
+// 路由守卫：强制登录（文档 4.1）与角色校验（TODO：接入 stores/user 后完善）
 router.beforeEach((to) => {
   document.title = to.meta.title ? `${to.meta.title} - CloudRail 论坛` : 'CloudRail 论坛'
-  if (to.meta.requiresRole) {
-    // 骨架阶段直接放行；实现后校验用户角色并跳转登录
-    return true
+  if (to.meta.requiresAuth) {
+    const token = localStorage.getItem('access_token')
+    if (!token) {
+      // 未登录：跳转登录页并记录回跳地址
+      return { path: '/login', query: { redirect: to.fullPath } }
+    }
   }
   return true
 })

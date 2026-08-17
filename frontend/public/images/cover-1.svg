@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="320" viewBox="0 0 480 320">
+  <rect width="480" height="320" fill="#1d3f8f"/>
+  <circle cx="400" cy="60" r="90" fill="#2f6bff" opacity="0.35"/>
+  <circle cx="80" cy="280" r="70" fill="#ffffff" opacity="0.08"/>
+  <rect x="40" y="120" width="8" height="80" rx="4" fill="#4a7dff"/>
+  <text x="64" y="150" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="30" font-weight="600" fill="#ffffff">CloudRail 社区</text>
+  <text x="64" y="184" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="16" fill="#c5d4ff">示例封面图 · 技术交流</text>
+</svg>

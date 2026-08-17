@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PagePlaceholder from '@/components/PagePlaceholder.vue'
 import { useUnreadCount } from '@/composables/useUnreadCount'
 
 /**
@@ -9,14 +10,7 @@ const { unreadCount } = useUnreadCount()
 </script>
 
 <template>
-  <div class="page">
-    <h2>消息</h2>
-    <p class="tip">未读：{{ unreadCount }}（通知列表待接入 GET /notifications）</p>
-  </div>
+  <PagePlaceholder title="消息" desc="回复、点赞、关注与系统通知" icon="💬">
+    未读数：{{ unreadCount }}；待接入 GET /notifications
+  </PagePlaceholder>
 </template>
-
-<style scoped>
-.tip {
-  color: var(--color-text-secondary);
-}
-</style>

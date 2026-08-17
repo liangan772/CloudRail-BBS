@@ -1,11 +1,21 @@
 """FastAPI 应用入口。"""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api.v1 import api_router
 from app.core.config import settings
+from app.core.db import init_db
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # 启动时建表（数据库不可用时自动降级，不阻塞启动）
+    await init_db()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -13,6 +23,7 @@ def create_app() -> FastAPI:
         title="CloudRail Forum API",
         version=__version__,
         description="中文论坛后端 API（开发文档见 docs/开发文档.md）",
+        lifespan=lifespan,
     )
 
     app.add_middleware(

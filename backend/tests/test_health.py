@@ -21,5 +21,8 @@ async def test_root(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_api_router_mounted(client: AsyncClient) -> None:
     resp = await client.get("/api/v1/categories")
-    # 骨架阶段业务模块为空路由，应返回 404（路由已挂载）；非 500 即说明聚合正常
-    assert resp.status_code == 404
+    # 分类接口已实现（种子数据），应返回 200 且含默认分类
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert len(data) >= 3
+    assert data[0]["name"] == "技术交流"

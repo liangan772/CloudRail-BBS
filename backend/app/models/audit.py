@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, DateTime, Float, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models import Base
+from app.models import Base, BigIntPk
 
 
 class AuditRecord(Base):
@@ -13,7 +13,7 @@ class AuditRecord(Base):
 
     __tablename__ = "audit_records"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
     target_type: Mapped[str] = mapped_column(String(16), default="post")  # post / comment / user
     target_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, default=None)
     content: Mapped[str] = mapped_column(Text)

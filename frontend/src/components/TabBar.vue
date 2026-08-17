@@ -71,7 +71,8 @@ function goPost() {
   height: calc(var(--tabbar-height) + var(--safe-area-bottom));
   padding-bottom: var(--safe-area-bottom);
   background: var(--color-card);
-  border-top: 1px solid #e5e6eb;
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -2px 12px rgb(31 35 41 / 4%);
 }
 
 .tab-item {
@@ -82,12 +83,14 @@ function goPost() {
   min-width: 44px;
   min-height: 44px;
   justify-content: center;
-  color: var(--color-text-secondary);
+  color: var(--color-text-3);
   font-size: 11px;
+  transition: color 0.15s ease;
 }
 
 .tab-item.active {
   color: var(--color-primary);
+  font-weight: 600;
 }
 
 .post-button {
@@ -101,7 +104,19 @@ function goPost() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgb(47 107 255 / 40%);
+  box-shadow: 0 4px 14px rgb(47 107 255 / 40%);
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.post-button:hover {
+  background: var(--color-primary-hover);
+  transform: scale(1.04);
+}
+
+.post-button:active {
+  transform: scale(0.96);
 }
 </style>
