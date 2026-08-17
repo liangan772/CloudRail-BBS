@@ -82,8 +82,17 @@ pip install -e ".[dev]"
 
 cp .env.example .env        # 按需修改数据库/Redis/密钥/AI 审核配置
 alembic upgrade head        # 应用数据库迁移
+
+# 启动后端（推荐使用脚本，自动加载 .env 中的 Uvicorn 配置）
+./run.sh                    # Git Bash / Linux / macOS；Windows PowerShell 用 .\run.ps1
+
+# 或直接显式指定参数（不依赖 .env）
 uvicorn app.main:app --reload --port 8000
 ```
+
+> 说明：`backend/.env` 中的 `UVICORN_HOST` / `UVICORN_PORT` / `UVICORN_RELOAD` 等配置
+> 由 `run.sh` / `run.ps1` 加载到进程环境后生效（uvicorn 的 `--env-file` 无法配置其自身参数，
+> 仅能为应用注入环境变量）。
 
 - API 文档（Swagger UI）：<http://localhost:8000/docs>
 - 健康检查：<http://localhost:8000/health>
@@ -150,6 +159,7 @@ cd deploy && docker compose up -d --build
 | `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL` | LLM 供应商接入（OpenAI 兼容协议） |
 | `AI_AUDIT_MODE` | 审核模式：`sync` 先审后发 / `async` 先发后审 / `off` 关闭 |
 | `AI_AUDIT_THRESHOLD` | 违规分阈值（默认 `0.6`，预留） |
+| `UVICORN_HOST` / `UVICORN_PORT` / `UVICORN_RELOAD` / `UVICORN_WORKERS` | Uvicorn 运行配置（由 `run.sh` / `run.ps1` 加载生效） |
 
 ## 文档
 
