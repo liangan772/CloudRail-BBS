@@ -1,0 +1,16 @@
+# 合并镜像构建上下文过滤（context = 仓库根目录）
+# 排除开发环境产物与无关目录
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/dist
+**/.git
+**/.env
+**/.env.*
+**/*.tsbuildinfo
+docs/

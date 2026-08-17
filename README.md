@@ -52,9 +52,11 @@
 
 ```
 ├── docs/            # 开发文档（架构、数据库、API、缓存、部署等完整设计）
-├── frontend/        # 前端（Vue 3 + Vite，含 Dockerfile 与 nginx.conf）
-├── backend/         # 后端（FastAPI + Celery，含 Dockerfile）
-└── deploy/          # 部署（docker-compose.yml、.env.example）
+├── frontend/        # 前端（Vue 3 + Vite）
+├── backend/         # 后端（FastAPI + Celery）
+├── deploy/          # 部署（docker-compose.yml、nginx 配置、entrypoint）
+├── Dockerfile       # 合并镜像（Nginx 前端 + FastAPI 后端，单镜像）
+└── .dockerignore
 ```
 
 ## 快速开始
@@ -135,10 +137,13 @@ docker compose -f deploy/docker-compose.yml up -d --build
 cd deploy && docker compose up -d --build
 ```
 
-两种方式均会启动：PostgreSQL + Redis + 后端 API + Worker + Beat + Nginx/前端。
+两种方式均会启动：PostgreSQL + Redis + 合并镜像（Nginx 前端 + 后端 API）+ Worker + Beat。
 
-- 前端：<http://localhost>
-- 后端 API：<http://localhost/api/>
+- 前端：<http://localhost>（合并镜像内 Nginx 托管）
+- 后端 API：<http://localhost/api/>（Nginx 反代到容器内 FastAPI）
+
+> 镜像策略：前后端打包为**单一镜像**（根目录 `Dockerfile`，多阶段构建：前端构建 → Python + Nginx 运行层）。
+> 手动构建：`docker build -t forum:latest .`；worker / beat 复用同一镜像，仅覆盖启动命令。
 
 > 首次部署请先 `cp deploy/.env.example deploy/.env` 并修改密码与密钥。
 

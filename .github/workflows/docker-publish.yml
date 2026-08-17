@@ -1,6 +1,6 @@
 name: Docker
 
-# 构建并发布 backend / frontend 两个镜像到 GHCR（ghcr.io/<owner>/<repo>-backend / -frontend）
+# 构建并发布合并镜像（Nginx 前端 + FastAPI 后端）到 GHCR：ghcr.io/<owner>/<repo>
 
 on:
   schedule:
@@ -22,10 +22,6 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    strategy:
-      fail-fast: false
-      matrix:
-        service: [backend, frontend]
 
     steps:
       - name: Checkout repository
@@ -52,13 +48,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@96383f45573cb7f253c731d3b3ab81c87ef81934 # v5.0.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@0565240e2d4ab88bba5387d719585280857ece09 # v5.0.0
         with:
-          context: ./${{ matrix.service }}
+          context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
