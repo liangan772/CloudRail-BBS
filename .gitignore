@@ -32,3 +32,4 @@ Thumbs.db
 deploy/data/
 *.log
 *.db
+release/

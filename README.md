@@ -192,6 +192,79 @@ curl http://localhost/api/v1/posts                      # 帖子列表（初始�
 
 ---
 
+## 手动部署（无 Docker）
+
+适用场景：目标机器没有 Docker，或需要以进程方式直接运行。
+
+### 1. 环境要求
+
+- Python 3.11+、Node.js 18+
+- 数据库：PostgreSQL 16 + Redis 7（生产推荐）；**零依赖体验可直接使用 SQLite**（无需安装任何数据库）
+
+### 2. 获取代码
+
+```bash
+# 方式一：克隆仓库
+git clone https://github.com/liangan772/CloudRail-BBS.git && cd CloudRail-BBS
+
+# 方式二：下载发行压缩包（GitHub Releases 页）
+# 解压后目录即项目根：unzip forum-v0.1.0.zip && cd forum-v0.1.0
+```
+
+### 3. 后端安装与启动
+
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate；macOS/Linux: source .venv/bin/activate
+./.venv/Scripts/activate
+
+pip install -e ".[dev]"
+# 国内网络建议加镜像：-i https://mirrors.aliyun.com/pypi/simple/
+
+cp .env.example .env    # 修改 SECRET_KEY（必须）、DATABASE_URL 等
+./run.sh                # 一键启动（自动建表 + 种子分类）；PowerShell 用 .\run.ps1
+```
+
+- API 文档：<http://localhost:8000/docs>
+- 数据库选型：默认 SQLite（`backend/forum.db`）；使用 PostgreSQL 时修改 `DATABASE_URL` 并手动建库
+
+```sql
+-- PostgreSQL 手动建库（可选）
+CREATE DATABASE forum;
+CREATE USER forum WITH PASSWORD 'forum';
+GRANT ALL PRIVILEGES ON DATABASE forum TO forum;
+```
+
+### 4. 前端安装与启动
+
+```bash
+cd frontend
+npm install
+npm run build           # 生产构建产物 dist/（发行包已自带，可跳过）
+```
+
+- **开发模式**：`npm run dev` → http://localhost:5173（/api 自动代理到 8000）
+- **生产托管**：用 Nginx 托管 `frontend/dist` 并反代 `/api`（参考 `deploy/nginx/forum.conf`，将 `listen 8080` 改为 `listen 80`、`proxy_pass` 指向后端地址）
+
+### 5. 验证与初始化
+
+```bash
+curl http://localhost:8000/health   # {"status":"ok",...}
+curl http://localhost:8000/api/v1/site-config
+```
+
+浏览器打开前端地址 → **注册页创建账号（首个用户自动成为管理员）** → 首页发帖/评论 → 管理后台配置。
+
+### 6. 生产运行注意事项
+
+- **SECRET_KEY**：必须替换为随机 64 字节（`python -c "import secrets;print(secrets.token_urlsafe(48))"`），否则服务拒绝启动
+- **Redis**：建议启用（验证码/限流/Refresh 吊销在 Redis 不可用时降级内存，多进程部署时需 Redis 共享状态）
+- **HTTPS**：Nginx 配置 TLS 或使用反向代理网关
+- **守护进程**：生产用 systemd / supervisor 托管 `uvicorn` 与 Celery Worker（`celery -A app.tasks.celery_app:celery_app worker`）
+
+---
+
 ## 配置说明
 
 后端环境变量（`backend/.env`，完整清单见开发文档 10.3 节）：
