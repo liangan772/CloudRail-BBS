@@ -1,0 +1,8 @@
+# 构建上下文过滤（frontend/）
+node_modules/
+dist/
+.venv/
+__pycache__/
+.env
+.env.*
+*.tsbuildinfo

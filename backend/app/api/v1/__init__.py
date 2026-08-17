@@ -10,6 +10,7 @@ from app.api.v1 import (
     admin,
     announcements,
     app as app_module,
+    audit,
     auth,
     auth_devices,
     auth_oauth,
@@ -49,6 +50,7 @@ api_router.include_router(blocks.router)
 api_router.include_router(polls.router)
 api_router.include_router(history.router)
 api_router.include_router(announcements.router)
+api_router.include_router(audit.router)
 api_router.include_router(gamification.router)
 api_router.include_router(app_module.router)
 api_router.include_router(admin.router)

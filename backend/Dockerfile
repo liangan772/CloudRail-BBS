@@ -1,4 +1,5 @@
 # 后端镜像（FastAPI + Celery）
+# 构建：docker build -t forum-backend backend/   （context = backend/）
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,11 +8,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# 构建上下文为仓库根目录：COPY backend/ 到 /app
-COPY backend/pyproject.toml ./
-COPY backend/app ./app
-COPY backend/alembic.ini ./
-COPY backend/alembic ./alembic
+COPY pyproject.toml ./
+COPY app ./app
+COPY alembic.ini ./
+COPY alembic ./alembic
 
 RUN pip install --no-cache-dir .
 
