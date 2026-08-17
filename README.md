@@ -211,6 +211,14 @@ git clone https://github.com/liangan772/CloudRail-BBS.git && cd CloudRail-BBS
 # 解压后目录即项目根：unzip forum-v0.1.0.zip && cd forum-v0.1.0
 ```
 
+> **发行包签名验证**：GitHub Releases 中的压缩包带官方构建出处签名（attestation），
+> 下载后可验证来源与完整性（需安装 [GitHub CLI](https://cli.github.com/)）：
+>
+> ```bash
+> gh attestation verify forum-v0.1.0.zip --repo liangan772/CloudRail-BBS
+> # 输出 Signed artifact sha256:... 且 Verification succeeded 即通过
+> ```
+
 ### 3. 后端安装与启动
 
 ```bash
