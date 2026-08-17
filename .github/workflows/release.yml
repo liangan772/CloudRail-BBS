@@ -1,7 +1,8 @@
 name: Release
 
 # 发行工作流：推送 v*.*.* 标签时，自动构建并发布压缩包到 GitHub Release
-# 压缩包使用 GitHub 官方构建出处签名（attestation），下载后可验证：
+# 压缩包使用 GitHub 官方工件认证（actions/attest，SLSA 构建出处证明，OIDC 签名），
+# 下载后可验证：
 #   gh attestation verify forum-v0.1.0.zip --repo liangan772/CloudRail-BBS
 # 用法：git tag v0.1.0 && git push origin v0.1.0
 
@@ -12,8 +13,9 @@ on:
 
 permissions:
   contents: write
-  attestations: write   # 允许对工件生成签名（attestation）
-  id-token: write       # OIDC 身份令牌（签名材料）
+  id-token: write          # OIDC 身份令牌（签名材料）
+  attestations: write      # 持久化工件认证（attestation）
+  artifact-metadata: write # 工件存储记录（actions/attest 官方要求）
 
 jobs:
   release:
@@ -43,9 +45,10 @@ jobs:
       - name: Package release archives (zip + tar.gz)
         run: python scripts/package_release.py --no-build
 
-      # GitHub 官方签名：对发行包生成 SLSA 构建出处证明（OIDC 签名）
+      # GitHub 官方工件认证：对发行包生成 SLSA 构建出处证明（actions/attest@v4，
+      # 默认 Provenance 模式，Sigstore 签发可验证证书，上传至 GH attestations API）
       - name: Attest build provenance (sign archives)
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest@v4
         with:
           subject-path: |
             release/*.zip
