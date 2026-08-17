@@ -28,7 +28,18 @@ const rules: FormRules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
+    { min: 6, max: 64, message: '密码长度需为 6-64 位', trigger: 'blur' },
+    {
+      validator: (_rule, value: string, callback) => {
+        if (!value) return callback()
+        if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+          callback(new Error('密码需同时包含字母和数字'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
   ],
   captcha_code: [{ required: true, message: '请输入验证码', trigger: 'input' }],
 }
@@ -87,7 +98,7 @@ async function onSubmit() {
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="至少 6 位"
+            placeholder="6-64 位，需包含字母和数字"
             size="large"
             show-password
           />

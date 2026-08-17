@@ -1,5 +1,9 @@
 """管理后台（角色 >= 2 管理员）。
 
+安全加固（v0.1.0）：
+- 管理写操作统一记录审计日志（admin_logs 表，见文档 5.2）
+- 数据库异常不对外泄露（详情入日志，对外返回通用提示）
+
 TODO（按文档 6.2）：
 - GET    /admin/stats/overview            运营看板
 - GET    /admin/users                      用户管理
@@ -16,13 +20,18 @@ TODO（按文档 6.2）：
 - GET/PUT /admin/topics                    话题运营
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.deps import require_role
+from app.core.deps import CurrentUser, require_role
+from app.models.admin_log import AdminLog
 from app.services import site_config as site_config_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["管理后台"])
 
@@ -30,6 +39,20 @@ router = APIRouter(prefix="/admin", tags=["管理后台"])
 class SiteConfigUpdate(BaseModel):
     value: str = Field(min_length=0, max_length=255)
     description: str = Field(default="", max_length=255)
+
+
+async def _log_admin(
+    session: AsyncSession, admin: CurrentUser, action: str, target_type: str = "", target_id: str = "", detail: str = ""
+) -> None:
+    """管理操作审计留痕（写失败仅告警，不阻断主流程）。"""
+    try:
+        session.add(
+            AdminLog(admin_id=admin.id, action=action, target_type=target_type, target_id=target_id, detail=detail)
+        )
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("审计日志写入失败: %s", exc)
+        await session.rollback()
 
 
 @router.get("/config/site", summary="站点配置列表（含描述）")
@@ -45,9 +68,14 @@ async def update_site_config(
     payload: SiteConfigUpdate,
     key: str = Path(min_length=1, max_length=64),
     session: AsyncSession = Depends(get_db),
-    _admin=Depends(require_role(2)),
+    admin: CurrentUser = Depends(require_role(2)),
 ) -> dict:
     try:
-        return await site_config_service.set_config(session, key, payload.value, payload.description)
+        result = await site_config_service.set_config(session, key, payload.value, payload.description)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=503, detail=f"数据库不可用：{exc}") from exc
+        logger.exception("站点配置更新失败 key=%s: %s", key, exc)
+        raise HTTPException(status_code=503, detail="数据库不可用，请稍后重试") from exc
+    await _log_admin(
+        session, admin, action="config.update", target_type="site_config", target_id=key, detail=f"{key}={payload.value}"
+    )
+    return result

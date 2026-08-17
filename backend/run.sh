@@ -32,4 +32,4 @@ set -a
 source .env
 set +a
 
-exec "$PY" -m uvicorn app.main:app "$@"
+exec "$PY" -m uvicorn app.main:app --reload-dir app "$@"

@@ -54,7 +54,7 @@
 
 ```
 ├── docs/            # 开发文档（架构、数据库、API、缓存、部署等完整设计）
-├── frontend/        # 前端（Vue 3 + Vite；含 nginx.conf 与本地示例图 public/images）
+├── frontend/        # 前端（Vue 3 + Vite；含本地示例图 public/images）
 ├── backend/         # 后端（FastAPI + Celery；含 run.sh / run.ps1 启动脚本）
 ├── deploy/          # 部署（docker-compose.yml、nginx 配置、entrypoint）
 ├── scripts/         # 辅助脚本（check.sh 检查、e2e_check.py 端到端联调）

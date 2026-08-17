@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 14
 
+    # 安全（v0.1.0 加固）
+    # 首个注册用户自动成为管理员（生产环境请设为 false，用引导脚本创建管理员）
+    admin_bootstrap: bool = True
+    # 通用 API 限流（每分钟每 IP 请求上限）
+    api_rate_limit: int = 120
+    # 登录/注册/验证码接口限流
+    auth_rate_limit: int = 5
+    auth_rate_window: int = 60
+
     # CORS（逗号分隔）
     cors_origins: str = "http://localhost:5173"
 
@@ -54,6 +63,14 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    def validate_security(self) -> None:
+        """启动安全校验：SECRET_KEY 必须是强密钥，否则拒绝启动。"""
+        if len(self.secret_key) < 32 or self.secret_key in ("change-me", "change-me-to-a-random-64-byte-secret"):
+            raise RuntimeError(
+                "SECRET_KEY 过弱：请配置至少 32 字符的随机密钥"
+                "（python -c \"import secrets; print(secrets.token_urlsafe(48))\"）"
+            )
 
 
 @lru_cache

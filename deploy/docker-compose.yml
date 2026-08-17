@@ -35,7 +35,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # 合并镜像：前端 + 后端 API（Nginx :80 + FastAPI :8000 容器内）
+  # 合并镜像：前端 + 后端 API（Nginx :8080 + FastAPI :8000 容器内，非 root 运行）
   backend:
     build:
       context: ..
@@ -51,8 +51,10 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "80:80"        # 前端页面 + /api（经 Nginx 反代）
+      - "80:8080"      # 前端页面 + /api（经 Nginx 反代）
       # - "8000:8000"  # 需要直连 FastAPI（绕过 Nginx）时取消注释
+    mem_limit: 512m
+    cpus: 1.0
 
   worker:
     build:
@@ -65,6 +67,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-only-secret-key-change-me}
     depends_on:
       - backend
+    mem_limit: 512m
+    cpus: 1.0
 
   beat:
     build:
@@ -77,6 +81,8 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-only-secret-key-change-me}
     depends_on:
       - backend
+    mem_limit: 256m
+    cpus: 0.5
 
 volumes:
   pgdata:

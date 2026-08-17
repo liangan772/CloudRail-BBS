@@ -17,6 +17,7 @@ class Base(DeclarativeBase):
 BigIntPk = BigInteger().with_variant(Integer, "sqlite")
 
 
+from app.models.admin_log import AdminLog  # noqa: E402
 from app.models.audit import AuditRecord  # noqa: E402
 from app.models.category import Category  # noqa: E402
 from app.models.comment import Comment  # noqa: E402
@@ -24,4 +25,14 @@ from app.models.post import Post  # noqa: E402
 from app.models.site_config import SiteConfig  # noqa: E402
 from app.models.user import User  # noqa: E402
 
-__all__ = ["Base", "BigIntPk", "AuditRecord", "Category", "Comment", "Post", "SiteConfig", "User"]
+__all__ = [
+    "Base",
+    "BigIntPk",
+    "AdminLog",
+    "AuditRecord",
+    "Category",
+    "Comment",
+    "Post",
+    "SiteConfig",
+    "User",
+]
