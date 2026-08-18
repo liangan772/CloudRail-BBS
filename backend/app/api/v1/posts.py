@@ -3,7 +3,8 @@
 安全加固（v0.1.0）：
 - 发帖/评论强制图形验证码（await 校验，Redis/内存存储）
 - 敏感词过滤（DFA，命中即拦截，见 services.sensitive）
-- AI 审核接入：AI_ENABLED 时 sync 模式先审后发（reject 拦截），async 模式投递 Celery（见 9.16）
+- AI 审核（v1.4 两级审核）：先发后审——内容发布后统一投递审核工作流（audit_flow），
+  AI 初审结论全部落库进入人工复审队列；AI reject 自动下架，人工复审为最终裁决（见 9.16）
 
 注意：静态路径（/posts/hot、/posts/search 等）必须先于动态路径（/posts/{id}）声明（文档 6.1）。
 TODO：点赞/收藏/搜索/投票/推荐流（文档 6.2）。
@@ -19,10 +20,10 @@ from app.core.config import settings
 from app.core.db import get_db
 from app.core.deps import CurrentUser, get_current_user
 from app.schemas.auth import CaptchaField
+from app.services import audit_flow
 from app.services import captcha as captcha_service
 from app.services import content as content_service
 from app.services import sensitive as sensitive_service
-from app.services.audit import AIAuditService, AuditError
 
 logger = logging.getLogger(__name__)
 
@@ -45,37 +46,43 @@ def _ok(data, message: str = "ok") -> dict:
 
 
 async def _check_content_security(title: str | None, content: str) -> None:
-    """内容安全检查：敏感词拦截 + AI 审核（sync 模式）。"""
-    # 1. 敏感词过滤（DFA）
+    """内容安全检查：敏感词过滤（DFA，命中即拦截）。
+
+    注：AI 审核为「先发后审」，在内容创建后由 _dispatch_audit 统一投递（见 9.16）。
+    """
     if sensitive_service.sensitive_filter.contains(content) or (
         title and sensitive_service.sensitive_filter.contains(title)
     ):
         raise HTTPException(status_code=400, detail="内容包含违规词，请修改后重新发布")
 
-    # 2. AI 审核（仅 sync 模式在发布链路同步拦截；async 由 Celery 后置处理）
-    if settings.ai_enabled and settings.ai_audit_mode == "sync":
-        service = AIAuditService()
-        try:
-            result = await service.audit_text(content, title=title)
-            if result["result"] == "reject":
-                raise HTTPException(status_code=400, detail=f"内容审核未通过：{result['reason']}")
-            if result["result"] == "review":
-                logger.info("AI 审核转人工: %s", result["reason"])
-        except AuditError:
-            # AI 未配置/调用异常：熔断降级放行（见文档 9.16），不阻塞发帖
-            logger.warning("AI 审核跳过（sync）: 服务不可用")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("AI 审核调用失败（sync 降级放行）: %s", exc)
 
+async def _dispatch_audit(
+    session: AsyncSession,
+    *,
+    target_type: str,
+    target_id: int,
+    content: str,
+    title: str | None = None,
+) -> None:
+    """两级审核 AI 初审投递（先发后审）：sync 模式请求内执行；async 模式投递 Celery。
 
-def _dispatch_async_audit(title: str | None, content: str, target_id: int) -> None:
-    """async 模式：发布后投递 AI 审核任务（失败静默，由人工审核兜底）。"""
-    if not settings.ai_enabled or settings.ai_audit_mode != "async":
+    无论 sync / async，AI 结论均落库进入人工复审队列（audit_flow.queue_ai_audit）。
+    """
+    if not settings.ai_enabled or settings.ai_audit_mode == "off":
+        return
+    if settings.ai_audit_mode == "sync":
+        await audit_flow.queue_ai_audit(
+            session,
+            target_type=target_type,
+            target_id=target_id,
+            content=content,
+            title=title,
+        )
         return
     try:
         from app.tasks.audit_tasks import audit_content
 
-        audit_content.delay(content, target_type="post", target_id=target_id, title=title)
+        audit_content.delay(content, target_type=target_type, target_id=target_id, title=title)
     except Exception as exc:  # noqa: BLE001
         logger.warning("AI 审核任务投递失败（async）: %s", exc)
 
@@ -125,7 +132,9 @@ async def create_post(
         category_id=payload.category_id,
         is_anonymous=payload.is_anonymous,
     )
-    _dispatch_async_audit(payload.title, payload.content, data["id"])
+    await _dispatch_audit(
+        session, target_type="post", target_id=data["id"], content=payload.content, title=payload.title
+    )
     return _ok(data, "发帖成功")
 
 
@@ -147,5 +156,7 @@ async def create_comment(
     data = await content_service.create_comment(
         session, post_id=post_id, user_id=user.id, content=payload.content
     )
-    _dispatch_async_audit(None, payload.content, data["id"])
+    await _dispatch_audit(
+        session, target_type="comment", target_id=data["id"], content=payload.content
+    )
     return _ok(data, "评论成功")

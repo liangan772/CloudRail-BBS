@@ -1,7 +1,18 @@
-"""敏感词过滤服务（DFA 自动机 + 符号降噪清洗）。"""
+"""敏感词过滤服务（DFA 自动机 + 符号降噪清洗）。
+
+词库来源（v1.4 DB 化）：
+- 首次启动：内置 DEFAULT_WORDS 种子写入 sensitive_words 表；
+- 启动加载：init_db 时从 DB 加载全部词并 rebuild DFA；
+- 管理端 CRUD（/admin/sensitive-words）实时增删并 rebuild。
+- DB 不可用时回退内置默认词库（不阻断业务）。
+"""
 
 import logging
 import re
+
+from sqlalchemy import select
+
+from app.models.sensitive_word import SensitiveWord
 
 logger = logging.getLogger(__name__)
 
@@ -65,5 +76,30 @@ class SensitiveWordFilter:
                     return True
         return False
 
+    @property
+    def words(self) -> list[str]:
+        """当前词库（供管理端列表展示）。"""
+        return list(self._words)
+
 
 sensitive_filter = SensitiveWordFilter()
+
+
+async def load_words_from_db(session) -> None:
+    """从 DB 加载词库到 DFA 过滤器（启动时调用；失败回退默认词库）。"""
+    try:
+        rows = (await session.execute(select(SensitiveWord.word))).scalars().all()
+        if rows:
+            sensitive_filter.rebuild([str(w) for w in rows])
+            logger.info("敏感词库已从 DB 加载: %s 条", len(rows))
+        else:
+            # 首次启动：种子写入 DB
+            for word in DEFAULT_WORDS:
+                session.add(SensitiveWord(word=word))
+            await session.commit()
+            sensitive_filter.rebuild(DEFAULT_WORDS)
+            logger.info("敏感词库已初始化种子: %s 条", len(DEFAULT_WORDS))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("敏感词 DB 加载失败，回退默认词库: %s", exc)
+        await session.rollback()
+        sensitive_filter.rebuild(DEFAULT_WORDS)

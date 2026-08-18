@@ -31,6 +31,10 @@ from app.api.v1 import (
     topics,
     users,
 )
+# 管理后台子模块（FastAPI 0.141 嵌套两层 include_router 展开缺陷：平级挂载）
+from app.api.v1.admin import audits as admin_audits
+from app.api.v1.admin import banners as admin_banners
+from app.api.v1.admin import reports as admin_reports
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -56,3 +60,6 @@ api_router.include_router(site.router)
 api_router.include_router(gamification.router)
 api_router.include_router(app_module.router)
 api_router.include_router(admin.router)
+api_router.include_router(admin_audits.router)
+api_router.include_router(admin_reports.router)
+api_router.include_router(admin_banners.router)

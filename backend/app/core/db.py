@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.models import Base, Category
+from app.services import sensitive as sensitive_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,5 +52,8 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("数据库表结构检查/创建完成")
         await _seed_categories()
+        # 敏感词库：DB 加载（首次种子），失败回退默认词库
+        async with async_session_factory() as session:
+            await sensitive_service.load_words_from_db(session)
     except Exception as exc:  # noqa: BLE001
         logger.warning("数据库不可用，跳过建表（%s）；请启动 PostgreSQL 后重试", exc)
