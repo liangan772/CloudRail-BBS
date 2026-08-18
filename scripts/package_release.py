@@ -44,6 +44,23 @@ def get_version() -> str:
     return m.group(1) if m else "0.1.0"
 
 
+def get_repo_name() -> str:
+    """从 git 远程 origin 解析仓库名（如 CloudRail-BBS）；解析失败时回退 forum。"""
+    try:
+        out = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        name = out.rstrip(".git").split("/")[-1]
+        if name:
+            return name
+    except Exception:  # noqa: BLE001
+        pass
+    return "forum"
+
+
 def _should_ignore(name: str, is_dir: bool) -> bool:
     if is_dir and name in IGNORE_DIRS:
         return True
@@ -95,7 +112,7 @@ def main() -> int:
         print("警告：frontend/dist 不存在，且使用了 --no-build，发布包将不含前端产物", file=sys.stderr)
 
     version = get_version()
-    base_name = f"forum-v{version}"
+    base_name = f"{get_repo_name()}-v{version}"
     staging = RELEASE_DIR / f".staging-{base_name}"
 
     print(f"==> 收集发布文件（版本 {version}）")
