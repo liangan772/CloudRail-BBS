@@ -1,0 +1,54 @@
+name: Release
+
+# 发行工作流：推送 v*.*.* 标签时，自动构建前端并打包为 zip / tar.gz 压缩包
+# （供手动安装），创建 GitHub Release 并上传资产。
+# 用法：git tag v0.1.0 && git push origin v0.1.0
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Package release archives (zip + tar.gz)
+        run: python scripts/package_release.py --no-build
+
+      - name: Generate Generic Attestations
+        uses: actions/attest@v4.2.2
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.zip
+            release/*.tar.gz
+          generate_release_notes: true
