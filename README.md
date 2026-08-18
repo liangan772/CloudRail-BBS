@@ -1,6 +1,6 @@
 # CloudRail 论坛
 
-> **版本：v0.1.1** ｜ 核心业务闭环（注册登录 → 发帖评论 → 管理后台）已实现可运行
+> **版本：v0.1.2** ｜ 核心业务闭环（注册登录 → 发帖评论 → 管理后台）已实现可运行
 
 前后端分离的中文社区论坛系统，一套 API 同时支撑 **Web / H5 / App / 小程序** 多端。核心业务闭环（注册登录 → 发帖评论 → 管理后台）已可运行，并规划了签到、积分、投票、话题广场、AI 自动审核等主流论坛能力。
 
@@ -208,14 +208,14 @@ curl http://localhost/api/v1/posts                      # 帖子列表（初始�
 git clone https://github.com/liangan772/CloudRail-BBS.git && cd CloudRail-BBS
 
 # 方式二：下载发行压缩包（GitHub Releases 页）
-# 解压后目录即项目根：unzip CloudRail-BBS-v0.1.1.zip && cd CloudRail-BBS-v0.1.1
+# 解压后目录即项目根：unzip CloudRail-BBS-v0.1.2.zip && cd CloudRail-BBS-v0.1.2
 ```
 
 > **发行包签名验证**：GitHub Releases 中的压缩包带官方构建出处签名（attestation），
 > 下载后可验证来源与完整性（需安装 [GitHub CLI](https://cli.github.com/)）：
 >
 > ```bash
-> gh attestation verify CloudRail-BBS-v0.1.1.zip --repo liangan772/CloudRail-BBS
+> gh attestation verify CloudRail-BBS-v0.1.2.zip --repo liangan772/CloudRail-BBS
 > # 输出 Signed artifact sha256:... 且 Verification succeeded 即通过
 > ```
 

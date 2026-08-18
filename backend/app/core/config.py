@@ -1,8 +1,10 @@
 """应用配置（pydantic-settings，读取环境变量 / .env）。"""
 
 from functools import lru_cache
-
+import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -65,12 +67,18 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     def validate_security(self) -> None:
-        """启动安全校验：SECRET_KEY 必须是强密钥，否则拒绝启动。"""
-        if len(self.secret_key) < 32 or self.secret_key in ("change-me", "change-me-to-a-random-64-byte-secret"):
-            raise RuntimeError(
-                "SECRET_KEY 过弱：请配置至少 32 字符的随机密钥"
-                "（python -c \"import secrets; print(secrets.token_urlsafe(48))\"）"
-            )
+        """启动安全校验：生产环境下 SECRET_KEY 必须是强密钥。"""
+        is_weak = len(self.secret_key) < 32 or self.secret_key in (
+            "change-me",
+            "change-me-to-a-random-64-byte-secret",
+        )
+        if is_weak:
+            if not self.debug:
+                raise RuntimeError(
+                    "生产环境 SECRET_KEY 过弱：请配置至少 32 字符的随机密钥"
+                    "（python -c \"import secrets; print(secrets.token_urlsafe(48))\"）"
+                )
+            logger.warning("[SECURITY] 当前处于 Debug/开发环境，正在使用弱密钥，生产环境请务必更换！")
 
 
 @lru_cache

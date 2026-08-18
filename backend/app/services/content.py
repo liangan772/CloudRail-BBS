@@ -61,20 +61,27 @@ async def list_posts(
     sort: str = "latest",
     category_id: int | None = None,
     cursor: int | None = None,
+    page: int = 1,
     limit: int = 20,
 ) -> list[dict]:
     stmt = select(Post).where(Post.status == 0)
     if category_id:
         stmt = stmt.where(Post.category_id == category_id)
-    if cursor:
-        stmt = stmt.where(Post.id < cursor)
+
+    # 针对不同排序模式采用合适的分页方式
     if sort == "hot":
-        stmt = stmt.order_by(Post.view_count.desc(), Post.id.desc())
+        # 热门流采用 offset 分页，避免 ID 游标导致漏数据
+        offset = (max(1, page) - 1) * limit
+        stmt = stmt.order_by(Post.view_count.desc(), Post.id.desc()).offset(offset).limit(limit)
     elif sort == "essence":
-        stmt = stmt.where(Post.is_essence.is_(True)).order_by(Post.created_at.desc(), Post.id.desc())
+        if cursor:
+            stmt = stmt.where(Post.id < cursor)
+        stmt = stmt.where(Post.is_essence.is_(True)).order_by(Post.id.desc()).limit(limit)
     else:
-        stmt = stmt.order_by(Post.created_at.desc(), Post.id.desc())
-    stmt = stmt.limit(limit)
+        # 最新流使用高性能 ID 游标分页
+        if cursor:
+            stmt = stmt.where(Post.id < cursor)
+        stmt = stmt.order_by(Post.id.desc()).limit(limit)
 
     posts = (await session.execute(stmt)).scalars().all()
     return await _enrich_posts(session, posts)
@@ -175,14 +182,20 @@ async def create_comment(
     content = content.strip()
     if not content or len(content) > 2000:
         raise HTTPException(status_code=400, detail="评论内容不能为空且不超过 2000 字")
+        
     post = await session.get(Post, post_id)
     if post is None or post.status != 0:
         raise HTTPException(status_code=404, detail="帖子不存在")
 
     comment = Comment(post_id=post_id, user_id=user_id, content=content)
     session.add(comment)
-    post.comment_count += 1
+    
+    # 🌟 修复：数据库原子自增，杜绝高并发写丢失
+    await session.execute(
+        update(Post).where(Post.id == post_id).values(comment_count=Post.comment_count + 1)
+    )
     await session.commit()
     await session.refresh(comment)
+    
     user = await session.get(User, user_id)
     return _comment_out(comment, user.username if user else None)

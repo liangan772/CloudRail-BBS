@@ -5,7 +5,7 @@
 - 登出吊销服务端 Refresh Token（见 services.auth）
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -24,10 +24,12 @@ _captcha_limiter = RateLimiter(limit=30, window=60)
 
 
 def _client_ip(request: Request) -> str:
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """安全获取客户端 IP（默认取真实直连 IP，防止通过自定义请求头伪造 XFF 绕过限流）。"""
+    # 如果系统明确部署在反向代理（如 Nginx）后，可从 header 中取最右侧代理提供的 IP；
+    # 在未配置受信代理前，最安全的方式是直接使用 socket 直连 IP：
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
 
 
 @router.get("/captcha", summary="获取图形验证码", response_model=dict)
@@ -66,7 +68,7 @@ async def refresh(payload: RefreshRequest, session: AsyncSession = Depends(get_d
 
 @router.post("/logout", summary="登出（吊销 Refresh Token）")
 async def logout(
-    payload: RefreshRequest | None = None,
+    payload: RefreshRequest | None = Body(None),
     _user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     await auth_service.logout(payload.refresh_token if payload else None)
