@@ -44,6 +44,10 @@ jobs:
 
       - name: Generate Generic Attestations
         uses: actions/attest@v4.2.2
+        with:
+          subject-path: |
+            release/*.zip
+            release/*.tar.gz
 
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
