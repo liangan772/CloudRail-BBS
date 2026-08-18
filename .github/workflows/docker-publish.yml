@@ -1,17 +1,13 @@
 name: Docker
 
-# 镜像工作流：构建并发布合并镜像到 GHCR（ghcr.io/<owner>/<repo>）
-# 仅生成版本号标签（latest / v*.*.* 等），无签名附加标签（避免 SHA256-*.sig 多余包）
-# PR 时仅构建验证不推送；同时执行依赖安全扫描。
+# 镜像工作流：仅当推送版本号标签（v*.*.*）时构建并发布合并镜像到 GHCR
+# （ghcr.io/<owner>/<repo>），标签即 latest / v0.1.2 等版本号；无签名附加标签
+# （避免 SHA256-*.sig 多余包）。同时执行依赖安全扫描。
 
 on:
-  schedule:
-    - cron: '26 21 * * *'
   push:
-    branches: ["main"]
-    tags: ['v*.*.*']
-  pull_request:
-    branches: ["main"]
+    tags:
+      - 'v*.*.*'
 
 env:
   REGISTRY: ghcr.io
