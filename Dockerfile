@@ -55,14 +55,14 @@ COPY deploy/pg_init.sh /pg_init.sh
 COPY deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh /pg_init.sh
 
+# 非 root 应用用户（uvicorn / nginx / celery 使用）——必须先创建，后续 chown 才能引用
+RUN useradd --create-home --uid 1000 forum
+
 # 数据目录（挂载卷 /data）：postgres / redis / uploads
 RUN mkdir -p /data/postgres /data/redis /data/uploads \
     && chown -R postgres:postgres /data/postgres \
     && chown -R redis:redis /data/redis \
-    && chown -R forum:forum /data/uploads
-
-# 非 root 应用用户（uvicorn / nginx / celery 使用）
-RUN useradd --create-home --uid 1000 forum \
+    && chown -R forum:forum /data/uploads \
     && chown -R forum:forum /app /usr/share/nginx/html
 
 EXPOSE 8080
