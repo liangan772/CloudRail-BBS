@@ -24,6 +24,21 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     task_default_retry_delay=30,
     task_max_retries=3,
+    # 投递不重试：Redis 不可用时快速失败，由调用方降级（如 posts 降级后台任务）
+    broker_connection_max_retries=0,
+    broker_connection_retry_on_startup=False,
+    task_publish_retry=False,
+    broker_transport_options={
+        "max_retries": 0,
+        "socket_connect_timeout": 1,
+        "socket_timeout": 1,
+    },
+    # result backend 同样快速失败（本地无 Redis 时不等待重试）
+    result_backend_transport_options={
+        "max_retries": 0,
+        "socket_connect_timeout": 1,
+        "socket_timeout": 1,
+    },
     beat_schedule={
         "sync-post-views": {
             "task": "app.tasks.sync_post_views",

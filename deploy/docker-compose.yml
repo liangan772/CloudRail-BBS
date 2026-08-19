@@ -1,7 +1,9 @@
-# CloudRail Forum 单容器部署（v1.5）
+# CloudRail Forum 单容器全栈部署（v1.6）
 # 用法：docker compose -f deploy/docker-compose.yml up -d --build
-# 仅一个容器：Nginx（前端 + /api 反代）+ FastAPI；SQLite 卷持久化；
-# 缓存/限流内存降级；AI 审核用进程内后台任务（无需 Redis/Celery/PostgreSQL）。
+# 仅一个容器：Nginx + FastAPI + PostgreSQL + Redis + Celery Worker（supervisord 编排）。
+# - PostgreSQL / Redis 仅监听容器内 127.0.0.1，不对外暴露端口；
+# - 数据持久化：/data（postgres 数据、redis AOF、uploads）；
+# - AI 审核 async 模式：Celery 投递（容器内 worker），Redis 不可用时自动降级进程内任务。
 
 services:
   forum:
@@ -9,11 +11,13 @@ services:
       context: ..
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: sqlite+aiosqlite:////data/forum.db
-      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379/0}
+      # 容器内服务（127.0.0.1）
+      DATABASE_URL: postgresql+asyncpg://forum:forum@127.0.0.1:5432/forum
+      REDIS_URL: redis://127.0.0.1:6379/0
       UPLOAD_DIR: /data/uploads
       SECRET_KEY: ${SECRET_KEY:-dev-only-secret-key-change-me}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
+      # AI 审核（两级审核：AI 初审 + 人工复审）
       AI_ENABLED: ${AI_ENABLED:-false}
       AI_BASE_URL: ${AI_BASE_URL:-https://api.deepseek.com/v1}
       AI_API_KEY: ${AI_API_KEY:-}
@@ -31,10 +35,10 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 30s
       timeout: 5s
-      retries: 3
-      start_period: 15s
-    mem_limit: 512m
-    cpus: 1.0
+      retries: 5
+      start_period: 20s
+    mem_limit: 1g
+    cpus: 2.0
 
 volumes:
   forumdata:

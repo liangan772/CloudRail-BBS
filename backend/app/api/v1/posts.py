@@ -68,10 +68,11 @@ async def _dispatch_audit(
     content: str,
     title: str | None = None,
 ) -> None:
-    """两级审核 AI 初审投递（先发后审）：sync 请求内执行；async 进程内后台任务。
+    """两级审核 AI 初审投递（先发后审）：sync 请求内执行；async 优先投递 Celery。
 
-    单容器部署无 Celery worker：async 模式使用 asyncio 后台任务（独立会话）执行，
-    结论同样落库进入人工复审队列；Celery 任务（app/tasks）保留供外部扩展部署使用。
+    单容器（v1.6）内置 Celery worker（broker=容器内 Redis）：async 模式投递
+    audit_content 任务；Redis 不可用（如本地开发）时自动降级进程内 asyncio 后台任务，
+    结论均落库进入人工复审队列。
     """
     if not settings.ai_enabled or settings.ai_audit_mode == "off":
         return
@@ -84,6 +85,15 @@ async def _dispatch_audit(
             title=title,
         )
         return
+
+    # async 模式：优先 Celery（容器内 worker）；连接失败降级进程内后台任务
+    try:
+        from app.tasks.audit_tasks import audit_content
+
+        audit_content.delay(content, target_type=target_type, target_id=target_id, title=title)
+        return
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Celery 投递失败，降级进程内后台任务: %s", exc)
 
     async def _run() -> None:
         from app.core.db import async_session_factory

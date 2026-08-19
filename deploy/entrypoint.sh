@@ -1,12 +1,15 @@
 #!/bin/sh
-# 合并镜像启动脚本：同时启动 Nginx（前端 + /api 反代）与 FastAPI 后端
+# 单容器启动脚本：初始化 PostgreSQL（首次）→ supervisord 管理全部进程
 set -e
 
-# 确保数据目录存在（挂载卷首次为空时；卷权限由镜像内 /data 属主继承）
-mkdir -p /data/uploads
+# 确保数据目录存在（挂载卷首次为空时）
+mkdir -p /data/postgres /data/redis /data/uploads
+chown postgres:postgres /data/postgres
+chown redis:redis /data/redis 2>/dev/null || true
+chown forum:forum /data/uploads
 
-# Nginx 前台运行
-nginx -g 'daemon off;' &
+# 首次初始化 PostgreSQL（幂等）
+/pg_init.sh
 
-# FastAPI 后端（Nginx 已配置将 /api/* 反代到本机 8000）
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# supervisord 前台运行（postgres/redis/nginx/uvicorn/celery）
+exec supervisord -c /etc/supervisor/supervisord.conf
