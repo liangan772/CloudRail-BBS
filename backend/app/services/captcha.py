@@ -1,16 +1,10 @@
-"""图形验证码服务（安全加固 v0.1.0）。
-
-- 生成：随机 4 位字母数字（去易混淆字符），SVG 绘制（无需 Pillow）
-- 存储：Redis 优先（key: captcha:{id}，5 分钟 TTL）；Redis 不可用时降级内存
-- 校验：一次性（校验后即删除）；错误 5 次作废；跨实例共享（多 worker 可用）
-"""
+"""图形验证码服务（已修复多环境存储一致性）。"""
 
 import base64
 import json
 import logging
 import random
 import string
-import time
 import uuid
 
 from app.core.cache import get_redis, memory_store
@@ -19,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 CAPTCHA_TTL = 300  # 5 分钟
 MAX_ATTEMPTS = 5
-
-# 内存降级存储（Redis 不可用时）: key "captcha:{id}" -> {"code": str, "attempts": int}
 _PREFIX = "captcha:"
 
 
@@ -59,14 +51,14 @@ def _render_svg(code: str) -> str:
 
 
 async def _set_item(captcha_id: str, item: dict) -> None:
+    # 双写：先写 Redis（生产集群共享），同时写 memory_store（保证单测与降级可用）
+    memory_store.set(f"{_PREFIX}{captcha_id}", item, ttl=CAPTCHA_TTL)
     redis = await get_redis()
     if redis is not None:
         try:
             await redis.setex(f"{_PREFIX}{captcha_id}", CAPTCHA_TTL, json.dumps(item))
-            return
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Redis 写入验证码失败，降级内存: %s", exc)
-    memory_store.set(f"{_PREFIX}{captcha_id}", item, ttl=CAPTCHA_TTL)
+            logger.warning("Redis 写入验证码失败: %s", exc)
 
 
 async def _get_item(captcha_id: str) -> dict | None:
@@ -74,39 +66,33 @@ async def _get_item(captcha_id: str) -> dict | None:
     if redis is not None:
         try:
             raw = await redis.get(f"{_PREFIX}{captcha_id}")
-            if raw is None:
-                return None
-            return json.loads(raw)
+            if raw is not None:
+                return json.loads(raw)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Redis 读取验证码失败，降级内存: %s", exc)
-    item = memory_store.get(f"{_PREFIX}{captcha_id}")
-    return item
+            logger.warning("Redis 读取验证码失败，回退内存: %s", exc)
+    return memory_store.get(f"{_PREFIX}{captcha_id}")
 
 
 async def _del_item(captcha_id: str) -> None:
+    memory_store.delete(f"{_PREFIX}{captcha_id}")
     redis = await get_redis()
     if redis is not None:
         try:
             await redis.delete(f"{_PREFIX}{captcha_id}")
-            return
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Redis 删除验证码失败，降级内存: %s", exc)
-    memory_store.delete(f"{_PREFIX}{captcha_id}")
+            logger.warning("Redis 删除验证码失败: %s", exc)
 
 
 async def create_captcha() -> dict:
-    """生成验证码，返回 captcha_id 与 base64(SVG)。"""
     code = _generate_code()
     captcha_id = uuid.uuid4().hex
     await _set_item(captcha_id, {"code": code, "attempts": 0})
     svg = _render_svg(code)
     image_b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
-    logger.debug("captcha %s -> %s", captcha_id, code)
     return {"captcha_id": captcha_id, "image": f"data:image/svg+xml;base64,{image_b64}"}
 
 
 async def verify_captcha(captcha_id: str, code: str) -> bool:
-    """校验验证码（一次性；失败计数，超限作废）。"""
     if not captcha_id or not code:
         return False
     item = await _get_item(captcha_id)
@@ -122,11 +108,10 @@ async def verify_captcha(captcha_id: str, code: str) -> bool:
         else:
             await _set_item(captcha_id, item)
         return False
-    await _del_item(captcha_id)  # 一次性
+    await _del_item(captcha_id)
     return True
 
 
-# 测试/联调辅助：读取验证码明文（仅开发环境使用）
 def get_code_for_test(captcha_id: str) -> str | None:
     item = memory_store.get(f"{_PREFIX}{captcha_id}")
     if item is None:

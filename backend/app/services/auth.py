@@ -68,7 +68,8 @@ async def _revoke_refresh(jti: str) -> None:
 
 
 async def revoke_user_refresh_tokens(user_id: int) -> None:
-    """吊销用户全部 Refresh Token（Redis scan；内存 store 无索引，登出走单 jti）。"""
+    """吊销用户全部 Refresh Token（同时清理 Redis 与进程内内存存储）。"""
+    # 1. 清理 Redis
     redis = await get_redis()
     if redis is not None:
         try:
@@ -79,9 +80,17 @@ async def revoke_user_refresh_tokens(user_id: int) -> None:
                     keys.append(key)
             if keys:
                 await redis.delete(*keys)
-            return
         except Exception as exc:  # noqa: BLE001
-            logger.warning("批量吊销 Refresh Token 失败: %s", exc)
+            logger.warning("Redis 批量吊销 Refresh Token 失败: %s", exc)
+
+    # 2. 清理内存降级存储（确保单机/测试模式下也能被彻底注销）
+    with memory_store._lock:
+        keys_to_del = [
+            k for k, (_, uid) in memory_store._data.items()
+            if k.startswith(_REFRESH_PREFIX) and uid == user_id
+        ]
+        for k in keys_to_del:
+            memory_store._data.pop(k, None)
 
 
 # ---------- 注册 / 登录 / 刷新 ----------
@@ -172,6 +181,8 @@ async def refresh(session: AsyncSession, refresh_token: str) -> dict:
     user = await session.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="用户不存在")
+    if user.status == 2:
+        raise HTTPException(status_code=403, detail="账号已被封禁")
 
     # 轮换：旧 Refresh Token 立即作废，签发新 Token
     await _revoke_refresh(str(jti))

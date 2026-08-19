@@ -1,8 +1,4 @@
-"""管理后台：举报队列与处理。
-
-- GET /admin/reports            举报队列（默认待处理 status=0，支持分页）
-- PUT /admin/reports/{id}       处理举报：ignore 忽略 / remove 删除内容 / ban_user 封禁用户
-"""
+"""管理后台：举报队列与处理。"""
 
 import logging
 from datetime import datetime, timezone
@@ -19,6 +15,7 @@ from app.models.comment import Comment
 from app.models.post import Post
 from app.models.report import Report
 from app.models.user import User
+from app.services import auth as auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +100,9 @@ async def handle_report(
 
     # 定位举报目标（post/comment 需找到作者，user 即目标）
     author_id: int | None = None
+    post: Post | None = None
+    comment: Comment | None = None
+
     if report.target_type == "post":
         post = await session.get(Post, report.target_id)
         if post is None:
@@ -117,12 +117,13 @@ async def handle_report(
     detail = payload.note or f"action={payload.action}"
     if payload.action == "remove":
         # 删除内容（软删除）：帖子 status=3 / 评论 status=2
-        if report.target_type == "post":
-            (await session.get(Post, report.target_id)).status = 3
-        elif report.target_type == "comment":
-            (await session.get(Comment, report.target_id)).status = 2
+        if report.target_type == "post" and post:
+            post.status = 3
+        elif report.target_type == "comment" and comment:
+            comment.status = 2
         else:
             raise HTTPException(status_code=400, detail="remove 仅支持帖子/评论")
+        report.status = 1
     elif payload.action == "ban_user":
         # 封禁用户（作者或直接目标用户）
         target_user_id = author_id if report.target_type in ("post", "comment") else report.target_id
@@ -133,14 +134,16 @@ async def handle_report(
             raise HTTPException(status_code=400, detail="不能封禁自己")
         user.status = 2
         detail = f"封禁用户 {user.username}" + (f"（{payload.note}）" if payload.note else "")
+        report.status = 1
+    elif payload.action == "ignore":
+        report.status = 2  # 修复：设置为 2（已忽略）
 
-    report.status = 1
     report.handled_by = admin.id
     report.handled_at = datetime.now(timezone.utc)
     report.handle_note = payload.note
     await session.commit()
 
-    # 审计留痕（失败仅告警）
+    # 审计留痕
     try:
         session.add(
             AdminLog(

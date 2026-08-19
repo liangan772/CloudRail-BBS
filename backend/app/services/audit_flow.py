@@ -11,7 +11,7 @@
 import asyncio
 import json
 import logging
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -226,8 +226,6 @@ async def review_record(
 
     record.human_status = action
     record.reviewed_by = reviewer_id
-    from datetime import datetime
-
     record.reviewed_at = datetime.now(UTC)
     record.review_note = note
 

@@ -206,6 +206,38 @@ async def test_report_flow(client: AsyncClient) -> None:
     async with async_session_factory() as session:
         user_b = await session.get(User, target_user_id)
         assert user_b is not None and user_b.status == 2
+        
+@pytest.mark.asyncio
+async def test_user_status_management(client: AsyncClient) -> None:
+    """用户管理：列表/搜索 + 禁言/封禁/解封；不能操作自己。"""
+    admin_token, admin_name = await _make_user(client, role=2)
+    user_token, username = await _make_user(client, role=0)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # 列表包含新用户
+    resp = await client.get(f"/api/v1/admin/users?keyword={username}", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    target_id = data["items"][0]["id"]
+
+    # 禁言 → 封禁 → 解封
+    resp = await client.put(f"/api/v1/admin/users/{target_id}/status", json={"status": 1}, headers=headers)
+    assert resp.status_code == 200 and resp.json()["status"] == 1
+    resp = await client.put(f"/api/v1/admin/users/{target_id}/status", json={"status": 2}, headers=headers)
+    assert resp.status_code == 200 and resp.json()["status"] == 2
+    resp = await client.put(f"/api/v1/admin/users/{target_id}/status", json={"status": 0}, headers=headers)
+    assert resp.status_code == 200 and resp.json()["status"] == 0
+
+    # 普通用户无权限
+    resp = await client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {user_token}"})
+    assert resp.status_code == 403
+
+    # 管理员不能操作自己
+    me = (await client.get(f"/api/v1/admin/users?keyword={admin_name}", headers=headers)).json()
+    my_id = me["items"][0]["id"]
+    resp = await client.put(f"/api/v1/admin/users/{my_id}/status", json={"status": 1}, headers=headers)
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio

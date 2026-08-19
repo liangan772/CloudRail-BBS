@@ -1,9 +1,8 @@
-"""内容服务：帖子 / 评论 / 分类。"""
+"""内容服务：帖子 / 评论 / 分类（含状态检查与置顶排序修复）。"""
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.category import Category
 from app.models.comment import Comment
@@ -19,7 +18,8 @@ def _post_out(post: Post, author_name: str | None = None, category_name: str | N
         "summary": post.content[:120],
         "category_id": post.category_id,
         "category": category_name,
-        "author_id": post.user_id,
+        # 🌟 修复：匿名帖子强制屏蔽真实 author_id，杜绝前端开盒
+        "author_id": None if post.is_anonymous else post.user_id,
         "author": None if post.is_anonymous else author_name,
         "is_anonymous": post.is_anonymous,
         "is_pinned": post.is_pinned,
@@ -68,20 +68,21 @@ async def list_posts(
     if category_id:
         stmt = stmt.where(Post.category_id == category_id)
 
-    # 针对不同排序模式采用合适的分页方式
     if sort == "hot":
-        # 热门流采用 offset 分页，避免 ID 游标导致漏数据
+        # 热门流采用 Offset 分页
         offset = (max(1, page) - 1) * limit
         stmt = stmt.order_by(Post.view_count.desc(), Post.id.desc()).offset(offset).limit(limit)
     elif sort == "essence":
-        if cursor:
-            stmt = stmt.where(Post.id < cursor)
-        stmt = stmt.where(Post.is_essence.is_(True)).order_by(Post.id.desc()).limit(limit)
-    else:
-        # 最新流使用高性能 ID 游标分页
+        stmt = stmt.where(Post.is_essence.is_(True))
         if cursor:
             stmt = stmt.where(Post.id < cursor)
         stmt = stmt.order_by(Post.id.desc()).limit(limit)
+    else:
+        # 最新流：仅在第 1 页（无游标 cursor 时）优先置顶，翻页时不重复插入置顶帖
+        if cursor:
+            stmt = stmt.where(Post.id < cursor).order_by(Post.id.desc()).limit(limit)
+        else:
+            stmt = stmt.order_by(Post.is_pinned.desc(), Post.id.desc()).limit(limit)
 
     posts = (await session.execute(stmt)).scalars().all()
     return await _enrich_posts(session, posts)
@@ -91,7 +92,7 @@ async def list_hot_posts(session: AsyncSession, limit: int = 10) -> list[dict]:
     stmt = (
         select(Post)
         .where(Post.status == 0)
-        .order_by(Post.view_count.desc(), Post.like_count.desc(), Post.id.desc())
+        .order_by(Post.is_pinned.desc(), Post.view_count.desc(), Post.like_count.desc(), Post.id.desc())
         .limit(limit)
     )
     posts = (await session.execute(stmt)).scalars().all()
@@ -108,13 +109,13 @@ async def _enrich_posts(session: AsyncSession, posts: list[Post]) -> list[dict]:
         for u in (
             await session.execute(select(User).where(User.id.in_(user_ids)))
         ).scalars().all()
-    }
+    } if user_ids else {}
     cats = {
         c.id: c.name
         for c in (
             await session.execute(select(Category).where(Category.id.in_(cat_ids)))
         ).scalars().all()
-    }
+    } if cat_ids else {}
     return [_post_out(p, users.get(p.user_id), cats.get(p.category_id)) for p in posts]
 
 
@@ -122,11 +123,29 @@ async def get_post(session: AsyncSession, post_id: int) -> dict:
     post = await session.get(Post, post_id)
     if post is None or post.status != 0:
         raise HTTPException(status_code=404, detail="帖子不存在")
-    post.view_count += 1
+    
+    # 原子自增浏览量
+    await session.execute(
+        update(Post).where(Post.id == post_id).values(view_count=Post.view_count + 1)
+    )
     await session.commit()
+    await session.refresh(post)
+    
     user = await session.get(User, post.user_id)
     cat = await session.get(Category, post.category_id)
     return _post_out(post, user.username if user else None, cat.name if cat else None)
+
+
+async def _verify_user_publish_permission(session: AsyncSession, user_id: int) -> User:
+    """校验发帖/评论权限：用户必须存在且未被禁言或封禁。"""
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="用户不存在")
+    if user.status == 2:
+        raise HTTPException(status_code=403, detail="账号已被封禁，无法发布内容")
+    if user.status == 1:
+        raise HTTPException(status_code=403, detail="账号已被禁言，无法发布内容")
+    return user
 
 
 async def create_post(
@@ -138,6 +157,8 @@ async def create_post(
     category_id: int,
     is_anonymous: bool = False,
 ) -> dict:
+    await _verify_user_publish_permission(session, user_id)
+
     title = title.strip()
     if not title or len(title) > 128:
         raise HTTPException(status_code=400, detail="标题不能为空且不超过 128 字")
@@ -172,13 +193,15 @@ async def list_comments(session: AsyncSession, post_id: int) -> list[dict]:
     users = {
         u.id: u.username
         for u in (await session.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()
-    }
+    } if user_ids else {}
     return [_comment_out(c, users.get(c.user_id)) for c in rows]
 
 
 async def create_comment(
     session: AsyncSession, *, post_id: int, user_id: int, content: str
 ) -> dict:
+    await _verify_user_publish_permission(session, user_id)
+
     content = content.strip()
     if not content or len(content) > 2000:
         raise HTTPException(status_code=400, detail="评论内容不能为空且不超过 2000 字")
@@ -190,7 +213,6 @@ async def create_comment(
     comment = Comment(post_id=post_id, user_id=user_id, content=content)
     session.add(comment)
     
-    # 🌟 修复：数据库原子自增，杜绝高并发写丢失
     await session.execute(
         update(Post).where(Post.id == post_id).values(comment_count=Post.comment_count + 1)
     )

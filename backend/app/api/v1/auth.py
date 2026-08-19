@@ -45,7 +45,7 @@ async def register(payload: RegisterRequest, request: Request, session: AsyncSes
     if not await _register_limiter.allow(f"register:{_client_ip(request)}"):
         raise HTTPException(status_code=429, detail="注册过于频繁，请稍后再试")
     if not await captcha_service.verify_captcha(payload.captcha_id, payload.captcha_code):
-        return {"code": 40001, "message": "验证码错误或已过期", "data": None}
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
     data = await auth_service.register(session, payload.username, payload.password, payload.email)
     return {"code": 0, "message": "注册成功", "data": data}
 
@@ -55,7 +55,7 @@ async def login(payload: LoginRequest, request: Request, session: AsyncSession =
     if not await _login_limiter.allow(f"login:{_client_ip(request)}"):
         raise HTTPException(status_code=429, detail="尝试过于频繁，请 60 秒后再试")
     if not await captcha_service.verify_captcha(payload.captcha_id, payload.captcha_code):
-        return {"code": 40001, "message": "验证码错误或已过期", "data": None}
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
     data = await auth_service.login(session, payload.username, payload.password)
     return {"code": 0, "message": "登录成功", "data": data}
 

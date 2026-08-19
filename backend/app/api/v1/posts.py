@@ -10,6 +10,7 @@
 TODO：点赞/收藏/搜索/投票/推荐流（文档 6.2）。
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,6 +27,9 @@ from app.services import content as content_service
 from app.services import sensitive as sensitive_service
 
 logger = logging.getLogger(__name__)
+
+# 后台审核任务句柄（避免被 GC；进程退出时未完成的任务自动丢弃）
+_background_tasks: set[asyncio.Task] = set()
 
 router = APIRouter(prefix="/posts", tags=["帖子"])
 
@@ -64,9 +68,10 @@ async def _dispatch_audit(
     content: str,
     title: str | None = None,
 ) -> None:
-    """两级审核 AI 初审投递（先发后审）：sync 模式请求内执行；async 模式投递 Celery。
+    """两级审核 AI 初审投递（先发后审）：sync 请求内执行；async 进程内后台任务。
 
-    无论 sync / async，AI 结论均落库进入人工复审队列（audit_flow.queue_ai_audit）。
+    单容器部署无 Celery worker：async 模式使用 asyncio 后台任务（独立会话）执行，
+    结论同样落库进入人工复审队列；Celery 任务（app/tasks）保留供外部扩展部署使用。
     """
     if not settings.ai_enabled or settings.ai_audit_mode == "off":
         return
@@ -79,27 +84,49 @@ async def _dispatch_audit(
             title=title,
         )
         return
+
+    async def _run() -> None:
+        from app.core.db import async_session_factory
+
+        try:
+            async with async_session_factory() as bg_session:
+                await audit_flow.queue_ai_audit(
+                    bg_session,
+                    target_type=target_type,
+                    target_id=target_id,
+                    content=content,
+                    title=title,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("后台 AI 审核失败 target=%s:%s: %s", target_type, target_id, exc)
+
     try:
-        from app.tasks.audit_tasks import audit_content
+        task = asyncio.get_running_loop().create_task(_run())
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
+    except RuntimeError as exc:
+        logger.warning("无事件循环，AI 审核跳过（async）: %s", exc)
 
-        audit_content.delay(content, target_type=target_type, target_id=target_id, title=title)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("AI 审核任务投递失败（async）: %s", exc)
 
-
-@router.get("", summary="帖子列表（最新/热门/精华，游标分页）")
+@router.get("", summary="帖子列表（最新/热门/精华，游标/页码分页）")
 async def list_posts(
     sort: str = Query("latest", pattern="^(latest|hot|essence)$"),
     category_id: int | None = Query(None, ge=1),
-    cursor: int | None = Query(None, ge=1),
+    cursor: int | None = Query(None, ge=1, description="游标 ID（用于 latest 和 essence）"),
+    page: int = Query(1, ge=1, description="页码（用于 hot 热门排序）"),
     limit: int = Query(20, ge=1, le=50),
     session: AsyncSession = Depends(get_db),
 ) -> dict:
     items = await content_service.list_posts(
-        session, sort=sort, category_id=category_id, cursor=cursor, limit=limit
+        session, sort=sort, category_id=category_id, cursor=cursor, page=page, limit=limit
     )
-    next_cursor = items[-1]["id"] if len(items) == limit and items else None
-    return _ok({"items": items, "next_cursor": next_cursor})
+    # 仅在非热门排序时返回 next_cursor，热门排序返回当前 page
+    next_cursor = items[-1]["id"] if len(items) == limit and items and sort != "hot" else None
+    return _ok({
+        "items": items,
+        "next_cursor": next_cursor,
+        "page": page if sort == "hot" else None,
+    })
 
 
 @router.get("/hot", summary="热门帖子")
@@ -122,7 +149,7 @@ async def create_post(
     session: AsyncSession = Depends(get_db),
 ) -> dict:
     if not await captcha_service.verify_captcha(payload.captcha_id, payload.captcha_code):
-        return {"code": 40001, "message": "验证码错误或已过期", "data": None}
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
     await _check_content_security(payload.title, payload.content)
     data = await content_service.create_post(
         session,
@@ -138,11 +165,6 @@ async def create_post(
     return _ok(data, "发帖成功")
 
 
-@router.get("/{post_id}/comments", summary="帖子评论列表")
-async def post_comments(post_id: int, session: AsyncSession = Depends(get_db)) -> dict:
-    return _ok(await content_service.list_comments(session, post_id))
-
-
 @router.post("/{post_id}/comments", summary="发表评论（登录 + 验证码 + 内容安全）")
 async def create_comment(
     post_id: int,
@@ -151,7 +173,7 @@ async def create_comment(
     session: AsyncSession = Depends(get_db),
 ) -> dict:
     if not await captcha_service.verify_captcha(payload.captcha_id, payload.captcha_code):
-        return {"code": 40001, "message": "验证码错误或已过期", "data": None}
+        raise HTTPException(status_code=400, detail="验证码错误或已过期")
     await _check_content_security(None, payload.content)
     data = await content_service.create_comment(
         session, post_id=post_id, user_id=user.id, content=payload.content

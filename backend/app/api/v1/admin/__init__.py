@@ -42,6 +42,7 @@ from app.models.comment import Comment
 from app.models.post import Post
 from app.models.sensitive_word import SensitiveWord
 from app.models.user import User
+from app.services import auth as auth_service
 from app.services import site_config as site_config_service
 from app.services import stats as stats_service
 from app.services import sensitive as sensitive_service
@@ -114,42 +115,62 @@ class UserStatusUpdate(BaseModel):
     status: int = Field(ge=0, le=2, description="0 正常 / 1 禁言 / 2 封禁")
 
 
-@router.get("/users", summary="用户列表（分页/搜索/状态过滤）")
-async def list_users(
-    keyword: str | None = Query(None, max_length=32, description="用户名模糊搜索"),
-    status: int | None = Query(None, ge=0, le=2, description="状态过滤：0 正常 / 1 禁言 / 2 封禁"),
+@router.get("/posts", summary="帖子列表（分页/状态/分类过滤）")
+async def list_admin_posts(
+    status: int | None = Query(None, ge=0, le=3, description="状态过滤"),
+    category_id: int | None = Query(None, ge=1),
+    keyword: str | None = Query(None, max_length=64, description="标题搜索"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_db),
     _admin: CurrentUser = Depends(require_role(2)),
 ) -> dict:
-    stmt = select(User)
-    if keyword:
-        stmt = stmt.where(User.username.contains(keyword))
+    stmt = select(Post)
     if status is not None:
-        stmt = stmt.where(User.status == status)
+        stmt = stmt.where(Post.status == status)
+    if category_id:
+        stmt = stmt.where(Post.category_id == category_id)
+    if keyword:
+        stmt = stmt.where(Post.title.contains(keyword))
     total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = (
         (
             await session.execute(
-                stmt.order_by(User.id.desc()).offset((page - 1) * limit).limit(limit)
+                stmt.order_by(Post.id.desc()).offset((page - 1) * limit).limit(limit)
             )
         )
         .scalars()
         .all()
     )
+    user_ids = {p.user_id for p in rows}
+    cat_ids = {p.category_id for p in rows}
+    
+    # 判空保护，防止空集合进入 SQL in_()
+    users = {
+        u.id: u.username
+        for u in (await session.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()
+    } if user_ids else {}
+    cats = {
+        c.id: c.name
+        for c in (await session.execute(select(Category).where(Category.id.in_(cat_ids)))).scalars().all()
+    } if cat_ids else {}
+    
     items = [
         {
-            "id": u.id,
-            "username": u.username,
-            "email": u.email,
-            "role": u.role,
-            "status": u.status,
-            "points": u.points,
-            "level": u.level,
-            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "id": p.id,
+            "title": p.title,
+            "content": p.content[:200],
+            "author_id": p.user_id,
+            "author": users.get(p.user_id),
+            "category": cats.get(p.category_id),
+            "status": p.status,
+            "is_pinned": p.is_pinned,
+            "is_essence": p.is_essence,
+            "view_count": p.view_count,
+            "comment_count": p.comment_count,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
         }
-        for u in rows
+        for p in rows
     ]
     return {"total": total or 0, "page": page, "limit": limit, "items": items}
 
@@ -166,8 +187,14 @@ async def update_user_status(
         raise HTTPException(status_code=404, detail="用户不存在")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="不能操作自己的账号")
+    
     user.status = payload.status
     await session.commit()
+    
+    # 🌟 若操作为封禁，立即吊销该用户的全部有效 Session
+    if payload.status == 2:
+        await auth_service.revoke_user_refresh_tokens(user_id)
+
     await _log_admin(
         session, admin, action="user.status", target_type="user", target_id=str(user_id),
         detail=f"status={payload.status}",
@@ -362,6 +389,48 @@ async def delete_sensitive_word(
 
 
 async def _rebuild_sensitive(session: AsyncSession) -> None:
-    """从 DB 全量重建 DFA 过滤器（增删后调用）。"""
+    """从 DB 全量重建 DFA 过滤器（增删后调用，严格同步数据库实际词集）。"""
     words = (await session.execute(select(SensitiveWord.word))).scalars().all()
-    sensitive_service.sensitive_filter.rebuild([str(w) for w in words] or sensitive_service.DEFAULT_WORDS)
+    # 严格根据 DB 中的实际词集重建，避免删除所有词后被 DEFAULT_WORDS 覆盖
+    sensitive_service.sensitive_filter.rebuild([str(w) for w in words])
+
+
+@router.get("/users", summary="用户列表（分页/搜索/状态过滤）")
+async def list_users(
+    keyword: str | None = Query(None, max_length=32, description="用户名模糊搜索"),
+    status: int | None = Query(None, ge=0, le=2, description="状态过滤：0 正常 / 1 禁言 / 2 封禁"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_db),
+    _admin: CurrentUser = Depends(require_role(2)),
+) -> dict:
+    """用户列表（管理后台用户管理页对接；v0.1.3 已实现，本地重构时被误删，此处恢复）。"""
+    stmt = select(User)
+    if keyword:
+        stmt = stmt.where(User.username.contains(keyword))
+    if status is not None:
+        stmt = stmt.where(User.status == status)
+    total = await session.scalar(select(func.count()).select_from(stmt.subquery()))
+    rows = (
+        (
+            await session.execute(
+                stmt.order_by(User.id.desc()).offset((page - 1) * limit).limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    items = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "role": u.role,
+            "status": u.status,
+            "points": u.points,
+            "level": u.level,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in rows
+    ]
+    return {"total": total or 0, "page": page, "limit": limit, "items": items}

@@ -1,9 +1,13 @@
-"""FastAPI 应用入口（已修复异常拦截与安全启动逻辑）。"""
+"""FastAPI 应用入口（完整修复版）。"""
 
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,33 +28,39 @@ _RATE_LIMIT_FREE = {"/", "/health", "/docs", "/redoc", "/openapi.json"}
 
 
 def _client_ip(request: Request) -> str:
-    """安全获取客户端 IP（默认取真实直连 IP，防止通过自定义请求头伪造 XFF 绕过限流）。"""
-    # 如果系统明确部署在反向代理（如 Nginx）后，可从 header 中取最右侧代理提供的 IP；
-    # 在未配置受信代理前，最安全的方式是直接使用 socket 直连 IP：
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """通用 API 限流：按 IP 每分钟 api_rate_limit 次。"""
+    """通用 API 限流：放行 OPTIONS 预检请求，防止破坏跨域规范。"""
 
     async def dispatch(self, request: Request, call_next):
+        # 放行 OPTIONS 预检请求与免限流路径
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         path = request.url.path
         if path not in _RATE_LIMIT_FREE and path.startswith("/api/"):
             if not await api_limiter.allow(f"api:{_client_ip(request)}"):
+                origin = request.headers.get("origin", "")
+                headers = {}
+                # 确保 429 响应带上 CORS 头，避免前端抛出跨域错误
+                if origin and (origin in settings.cors_origin_list or "*" in settings.cors_origin_list):
+                    headers["Access-Control-Allow-Origin"] = origin
+                    headers["Access-Control-Allow-Credentials"] = "true"
                 return JSONResponse(
                     status_code=429,
                     content={"code": 42900, "message": "请求过于频繁，请稍后重试", "data": None},
+                    headers=headers,
                 )
         return await call_next(request)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # 安全启动校验：生产环境强制，开发环境警告
     settings.validate_security()
-    # 启动时建表
     await init_db()
     yield
 
@@ -59,7 +69,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="CloudRail Forum API",
         version=__version__,
-        description="中文论坛后端 API（开发文档见 docs/开发文档.md）",
+        description="中文论坛后端 API",
         lifespan=lifespan,
     )
 
@@ -83,10 +93,11 @@ def create_app() -> FastAPI:
         return {"status": "ok", "version": __version__}
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        """全局非预期异常收敛：放行标准 HTTP 异常与校验异常，其余统一 500。"""
-        if isinstance(exc, (HTTPException, StarletteHTTPException, RequestValidationError)):
-            raise exc
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> Response:
+        if isinstance(exc, (HTTPException, StarletteHTTPException)):
+            return await http_exception_handler(request, exc)
+        if isinstance(exc, RequestValidationError):
+            return await request_validation_exception_handler(request, exc)
         logger.exception("未处理内部异常: %s %s: %s", request.method, request.url.path, exc)
         return JSONResponse(
             status_code=500,
